@@ -1,0 +1,15 @@
+name = "BoundedBrain"
+version = "0.0.1"
+defaultTargets = ["BoundedBrain"]
+
+[[lean_lib]]
+name = "BoundedBrain"
+
+# `lake build bbmon`, then `lake exe bbmon ...`: runs the verified monitor on JSON input (TODO P3-7).
+[[lean_exe]]
+name = "bbmon"
+root = "BBMon"
+
+# TODO(P3-6): if Mathlib becomes necessary (e.g. for the optional primitive-recursion
+# bridge theorem), add it here and pin a revision that matches `lean-toolchain`.
+# Keep the core free of Mathlib.

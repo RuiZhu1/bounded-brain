@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bounded-brain"
+version = "0.0.1"
+description = "Verified, bounded runtime monitors for robot foundation models (Python reference implementation)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "Rui Zhu" }]
+dependencies = []  # keep the monitor dependency-free on purpose
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "hypothesis>=6", "ruff>=0.4"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bounded_brain"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Pinned explicitly so a new ruff release cannot change what CI checks: syntax errors, undefined names,
+# unused imports and variables, and similar errors (ruff's classic default set).
+select = ["E4", "E7", "E9", "F"]

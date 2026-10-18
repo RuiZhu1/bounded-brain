@@ -1,0 +1,153 @@
+# Continuous integration on GitHub's hosted runners (free for public repositories; 4 CPUs, 16 GB, no GPU).
+# What each job checks is summarised in README.md ("Continuous integration"); `make ci` runs the same locally.
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"   # Mondays 03:17 UTC: catches breakage from new releases of the tools used here
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash   # bash -eo pipefail: a failing command anywhere in a pipe fails the step
+
+jobs:
+  lean:
+    name: Lean proofs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      # Official Lean action: installs elan and the toolchain pinned in lean/lean-toolchain, then
+      # `lake build --wfail` (any warning, e.g. "declaration uses 'sorry'", fails the build),
+      # leanchecker (replays every declaration through the kernel) and axiom-audit (every declaration
+      # in BoundedBrain uses only propext, Classical.choice, Quot.sound).
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6  # v1.6.2
+        with:
+          lake-package-directory: lean
+          build-args: "--wfail"
+          leanchecker: "true"
+          axiom-audit: "true"
+      - name: Main theorems keep their stated form; standard axioms only (lean/Checks.lean)
+        working-directory: lean
+        run: lake env lean Checks.lean
+      - name: Build bbmon (the verified monitor as an executable)
+        working-directory: lean
+        run: lake build --wfail bbmon
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bbmon
+          path: lean/.lake/build/bin/bbmon
+          if-no-files-found: error
+          retention-days: 7
+
+  nanoda:
+    name: Independent kernel (nanoda)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: leanprover/lean-action@24581d74d674803a25a81b10b059c5c0cdd344c6  # v1.6.2
+        with:
+          lake-package-directory: lean
+      - name: Rust (for nanoda)
+        run: |
+          if ! command -v cargo >/dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Re-check every declaration with nanoda, a second type checker written in Rust
+        working-directory: lean
+        run: bash scripts/nanoda.sh
+
+  conformance:
+    name: Lean monitor = Python monitor
+    needs: lean
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: bbmon
+          path: bin
+      - run: chmod +x bin/bbmon
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest==9.1.1
+      - name: Differential test (BB_REQUIRE_LEAN=1 turns a missing binary into a failure, not a skip)
+        working-directory: monitor
+        env:
+          BB_LEAN_EXE: ${{ github.workspace }}/bin/bbmon
+          BB_REQUIRE_LEAN: "1"
+        run: python -m pytest -q tests/test_lean_conformance.py
+
+  python:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install pytest==9.1.1
+      - name: Monitor tests (the Lean conformance tests run in their own job)
+        working-directory: monitor
+        run: python -m pytest -q
+      - name: The package installs, with no runtime dependencies
+        run: |
+          python -m pip install ./monitor
+          python -c "import importlib.metadata as m, bounded_brain; assert not [r for r in (m.requires('bounded-brain') or []) if 'extra ==' not in r]; print('bounded_brain', bounded_brain.__version__)"
+
+  lint:
+    name: Lint and notebook sync
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install ruff==0.17.1
+      - name: ruff (rule set pinned in ruff.toml and monitor/pyproject.toml)
+        run: ruff check .
+      - name: All Python files compile
+        run: python -m compileall -q experiments monitor
+      - name: The Colab notebook is generated from its kit (experiments/colab/build_notebook.py)
+        run: |
+          python experiments/colab/build_notebook.py
+          git diff --exit-code -- experiments/colab/libero_traces.ipynb
+
+  paper:
+    name: Paper PDF
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: TeX Live (only the Ubuntu packages the paper needs)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends latexmk texlive-latex-base texlive-latex-recommended lmodern
+      - name: Build paper/main.tex
+        working-directory: paper
+        run: latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=build main.tex
+      - uses: actions/upload-artifact@v7
+        with:
+          name: paper
+          path: paper/build/main.pdf
+          if-no-files-found: error

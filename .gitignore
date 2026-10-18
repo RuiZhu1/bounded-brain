@@ -1,0 +1,64 @@
+# --- OS / editors ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+dist/
+build/
+
+# --- Lean ---
+lean/.lake/
+.lake/
+
+# --- LaTeX build output ---
+paper/build/
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+
+# --- Course materials (instructor's copyrighted slides/sheets): local only ---
+course/*
+!course/README.md
+!course/.gitkeep
+
+# --- Paper PDFs and notes' attachments: re-download from arXiv ---
+refs/papers/*
+!refs/papers/.gitkeep
+
+# --- Models, data, experiment artifacts ---
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+data/
+checkpoints/
+outputs/
+wandb/
+experiments/runs/
+experiments/videos/
+
+# --- Secrets ---
+.env
+.env.*
+*.key
+*.pem
+
+# --- Owner's private notes (personal and institutional context): local only, never commit ---
+private/

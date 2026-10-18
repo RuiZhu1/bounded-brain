@@ -1,0 +1,63 @@
+% bounded-brain — paper skeleton. Working title; every section is a stub with TODO markers.
+% Claims discipline (see ../CLAUDE.md): no "provably safe", no comparisons to named systems.
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}   % Type 1 fonts for the T1 encoding (no bitmap fonts in the PDF)
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newcommand{\Sat}{\mathsf{Sat}}
+\newcommand{\progress}{\mathsf{progress}}
+
+\title{Verified Bounded Runtime Monitors for Robot Foundation Models\\
+\large (working title)}
+\author{Rui Zhu}  % affiliation line: TODO Q9
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+TODO(P7): one paragraph. Problem (task-level safety of VLA policies), approach (bounded LTLf fragment,
+progression monitor, Lean 4 proof), results (only what is actually proved/measured), limits (assumptions A1--A4).
+\end{abstract}
+
+\section{Introduction}
+% TODO: motivate with VLA models; cite continuous safety layers (\cite{tolle2025atacom}); state the gap ONLY after Gate G1.
+% Contribution list must match README C1--C4 and only include what is achieved.
+
+\section{Background}
+% LTLf, formula progression, runtime verification, VLA pipelines. Cite only VERIFIED entries (docs/02).
+
+\section{Specification Fragment}
+% Grammar from docs/04; why every operator is structural or bounded; the internal pending constructor.
+
+\section{The Monitor and Its Verified Correctness}
+% Definitions of progress/acceptsEmpty; Theorem (accepts iff Sat); early-verdict soundness; resource bound.
+% Mirror lean/BoundedBrain/*.lean. Include the strong-Next subtlety.
+
+\section{Integration with a VLA Pipeline}
+% Architecture, assumptions A1--A4, interchange format, latency.
+
+\section{Evaluation}
+% Benchmark, baselines (raw VLA; continuous filter; filter+monitor), metrics, seeds, perception-noise ablation.
+
+\section{Related Work}
+% From docs/03: \cite{manganaris2026survey}, \cite{liu2024constraintmanifold}.
+
+\section{Limitations}
+% A1--A4, spec adequacy, simulation-only (if so), sound-but-incomplete early verdicts.
+
+\section{Conclusion}
+
+\bibliographystyle{plain}
+\bibliography{refs}
+% TODO: remove \nocite{*} once real citations exist.
+\nocite{*}
+
+\end{document}

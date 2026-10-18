@@ -1,0 +1,6 @@
+suite,pi05_s1000,pi05_s2000,pi05_s3000,mean,sd_over_seeds,successes,episodes,pooled,wilson95_lo,wilson95_hi,lerobot,openpi,lerobot_in_ci,openpi_in_ci
+libero_spatial,98.0,99.0,98.0,98.33,0.58,295,300,98.33,96.2,99.3,97.00,98.80,True,True
+libero_object,100.0,100.0,99.0,99.67,0.58,299,300,99.67,98.1,99.9,99.00,98.20,True,True
+libero_goal,97.0,93.0,96.0,95.33,2.08,286,300,95.33,92.3,97.2,98.00,98.00,False,False
+libero_10,94.0,97.0,98.0,96.33,2.08,289,300,96.33,93.6,97.9,96.00,92.40,True,False
+average,97.2,97.2,97.8,97.42,0.29,1169,1200,97.42,96.4,98.2,97.50,96.85,True,True

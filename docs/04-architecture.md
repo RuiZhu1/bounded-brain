@@ -1,0 +1,102 @@
+# 04 — Architecture, specification fragment, guarantees
+
+Status: **design draft** — freeze in Phase 2 (P2-1).
+
+## System view
+
+```
+ camera / proprio ──► Perception ──► labels (set of atoms per step) ──► MONITOR(φ) ──► verdict
+        │                                                                   │            │
+        ▼                                                                   ▼            ▼
+   VLA (π0 via LeRobot) ──► action chunk ──► Continuous filter ──► Robot   log / hold / retreat
+                                              (ATACOM / CBF)
+```
+
+* **Perception → labels.** Maps observations (or privileged simulator state at first) to a *label*: the set of
+  atomic propositions true at this control step (`grasp_stable`, `lift_cmd`, `in_forbidden_zone`, …).
+* **Monitor.** Consumes one label per step, maintains a residual formula, outputs `PENDING / SATISFIED / VIOLATED`.
+* **Policy + filter.** Unchanged from existing work. The filter handles continuous geometry; the monitor handles
+  discrete/temporal task rules.
+* **Reaction.** Detect-only first (logging). Enforcement mode: on `VIOLATED` or imminent violation, hold/retreat.
+
+## Specification fragment (grammar)
+
+```
+φ ::= tt | ff
+    | p | ¬p                      -- literals; negation only on atoms (NNF)
+    | φ ∧ φ | φ ∨ φ
+    | X φ                         -- strong next: a next step must exist
+    | G φ                         -- always (over the rest of the finite trace)
+    | G[0,k] φ                    -- always within the next k+1 steps
+    | F[0,k] φ                    -- eventually within the next k+1 steps
+```
+
+Internal only: `pending φ` ("a step exists here and φ holds at it"), produced by progression.
+
+Why this shape: **every operator is structural or bounded**, so the monitor step is a total function with no
+unbounded search. Bounded `G[0,k]`/`F[0,k]` are bounded quantifiers over a window of the trace (cf. course Lecture 2).
+Unbounded `F`/`U` are omitted on purpose; add bounded `U[0,k]` only if the spec library (P2-5) needs it.
+
+## Semantics (LTLf, reference)
+
+Trace = finite list of labels. `holds(trace, i, φ)` / Lean `Sat tr φ i`. Positions at/after the end satisfy
+nothing that needs a step (literals, `X`, `pending`, `F[0,k]`) and satisfy vacuous universals (`G`, `G[0,k]`).
+Code: `monitor/src/bounded_brain/spec.py` and `lean/BoundedBrain/Formula.lean`.
+
+## Monitor by formula progression
+
+`progress σ φ` rewrites φ into the obligation on the rest of the trace after consuming step σ:
+
+| φ | `progress σ φ` |
+|---|---|
+| `p` / `¬p` | `tt` or `ff` depending on σ |
+| `φ ∧ ψ`, `φ ∨ ψ` | `simpAnd/simpOr (progress σ φ) (progress σ ψ)` |
+| `X φ` | `pending φ` |
+| `pending φ` | `progress σ φ` |
+| `G φ` | `simpAnd (progress σ φ) (G φ)` |
+| `G[0,k] φ` | `k=0`: `progress σ φ`; else `simpAnd (progress σ φ) (G[0,k-1] φ)` |
+| `F[0,k] φ` | `k=0`: `progress σ φ`; else `simpOr (progress σ φ) (F[0,k-1] φ)` |
+
+End of trace: `acceptsEmpty` = `tt`→true, `ff`→false, literals→false, `X`/`pending`→false, `G`/`G[0,k]`→true,
+`F[0,k]`→false, `∧`/`∨` compositional. Early verdicts: residual `ff` ⇒ VIOLATED, `tt` ⇒ SATISFIED.
+
+### Design note: why `pending` exists (a bug we caught)
+
+The naive rule `progress σ (X φ) = φ` is **wrong** at the end of a trace: `X (G a)` on a one-step trace must be
+*false* (strong next needs a successor step), but the residual `G a` is vacuously true on the empty remainder.
+`pending φ` records the obligation "a step must exist"; it is discharged by the next `progress` and fails
+`acceptsEmpty`. The Python test suite contains a regression for this
+(`test_strong_next_needs_a_successor_step`), and mutating `progress` to the naive rule makes the exhaustive
+agreement test fail. The Lean key lemma `progress_sat` (TODO P3-2) is only true with `pending`.
+
+### Early verdicts are sound, not complete
+
+`VIOLATED` is reported only when the residual is syntactically `ff`. A residual may be unsatisfiable on every
+extension without having been simplified to `ff` (e.g. contradictory pending obligations). The end-of-trace answer
+is exact. Completeness would need a satisfiability check on the residual (TODO P2-2).
+
+### Resource bound (open)
+
+Per-step residual growth is **not** a constant factor (`G φ` conjoins one new residual per step). Alive obligations age
+and expire after at most `horizon φ` steps (sum of `X`-depth and bounds), so the candidate bound is
+`size(run φ tr) ≤ size φ · (horizon φ + 1)`. Empirical check so far (one spec, 5000 random steps): spec size 5, worst
+residual 8. To be stated precisely (P2-4) and proved (P3-5).
+
+## Assumptions and guarantees
+
+* **A1 (perception).** The labels given to the monitor are correct for the atoms used.
+* **A2 (specification).** The formula captures the intended safety/progress rule.
+* **A3 (actuation).** The fallback (hold/retreat) is executed and is itself safe in the situation.
+* **A4 (timing).** Monitor step time is below the control period; labels arrive at the control rate.
+
+| ID | Guarantee | Depends on | Evidence |
+|---|---|---|---|
+| G1 | Monitor verdict = LTLf semantics; early verdicts sound | none beyond the definitions | Lean (P3-3, P3-4) — *not yet proved* |
+| G2 | Step cost and memory bounded by a function of the spec | none | Lean (P3-5) + tests — *open* |
+| G3 | Executed trace satisfies φ (enforcement) | A1, A3, A4 and a model of what the fallback can do | out of scope for the first paper; do not claim |
+
+## Interchange format (Lean ↔ Python differential tests)
+
+* Formula: `spec.to_dict` JSON, e.g. `{"op":"always","arg":{"op":"or","left":{"op":"lit","name":"lift_cmd","positive":false},"right":{"op":"lit","name":"grasp_stable","positive":true}}}`.
+* Trace: JSONL, one object per step: `{"t": 0, "labels": ["grasp_stable"]}`.
+* Output: JSONL of `{"t": n, "verdict": "pending|satisfied|violated"}` plus a final `{"accepts": true|false}`.
