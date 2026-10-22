@@ -2,7 +2,7 @@
 
 Conventions: `[ ]` open · `[~]` in progress · `[x]` done · **Gate** = a decision point (see
 `docs/06-risks-and-kill-criteria.md`). IDs (`P3-3`) are referenced from code (`sorry` tags) and docs.
-Update this file in the same change as the work. Last reviewed: 2026-10-18 (first public push; CI on GitHub Actions).
+Update this file in the same change as the work. Last reviewed: 2026-10-22 (Phase 1 literature check; Gate G1 open).
 
 ## 0. Questions for the owner
 
@@ -27,6 +27,8 @@ Open follow-ups:
 - [ ] **Q10** An institutional-policy question (risk R6); details in the owner's private notes. The owner's call.
 - [ ] **Q11** The owner wants a broader scope than the verified monitor (2026-10-17). Agree on an extended
       roadmap before changing `README.md` / `docs/01`.
+- [ ] **Q12** Gate G1: proceed, re-scope or stop. Evidence, options (a)–(e) and the assistant's recommendation are in
+      `docs/01-research-question.md` ("Gate G1"). The owner's call; record it in `docs/07`. Related to Q11.
 
 ## Phase 0 — Orientation and environment (first session)
 
@@ -59,23 +61,40 @@ Open follow-ups:
 
 ## Phase 1 — Literature gap check (1–2 weeks) — *decides whether the project is worth doing*
 
-- [ ] **P1-1** Search for **verified runtime monitors in proof assistants** (Isabelle, Coq/Rocq, Lean,
+Done in one session on 2026-10-22 (D-027): relevant sections of the closest works, abstracts of the rest.
+
+- [x] **P1-1** Search for **verified runtime monitors in proof assistants** (Isabelle, Coq/Rocq, Lean,
       HOL, ACL2, Agda) for LTL/LTLf/MFOTL/STL. Unverified leads from memory to check: VeriMon
       (Isabelle/HOL), verified LTL monitors in Coq, LTLf progression (Bacchus & Kabanza; De Giacomo & Vardi).
-- [ ] **P1-2** Search for **formally verified components in robot-foundation-model safety stacks**.
-- [ ] **P1-3** Read the CBF+VLA works listed in `docs/03-related-work.md` (rows marked SNIPPET): which
+      *2026-10-22:* closest is MLTL formula progression in Isabelle/HOL (F54); also LTL3 progression (F55), VeriMon
+      (F53), Rizaldi et al. (F56), a Coq MTL monitor (F57), a Lean 4 monitor for LLM-agent workflows (F59).
+      One search for ACL2 and Agda returned nothing specific to them. `docs/03` D.
+- [x] **P1-2** Search for **formally verified components in robot-foundation-model safety stacks**.
+      *2026-10-22:* none found (F61). Nearest: temporal logic without proofs (STeP, RoboGuard, Safety Chip, SENTINEL;
+      F62, F63) and machine-checked monitors on non-learned systems (F56, F60, VeriPhy). `docs/03` D–E.
+- [x] **P1-3** Read the CBF+VLA works listed in `docs/03-related-work.md` (rows marked SNIPPET): which
       constraint types, any task-level/temporal constraints, any machine-checked proof?
-- [ ] **P1-4** Targeted re-read: survey (2602.06971) §4.4 runtime monitoring; Agia et al. 2024
-      (runtime monitoring of generative policies, CoRL).
-- [ ] **P1-5** Inventory the Lean ecosystem: what Mathlib has for computability (`Primrec`, `Partrec`,
+      *2026-10-22 (abstracts):* rows 4–8 enforce geometric CBF constraints, with no temporal logic and no
+      machine-checked proof (F64); ProbeAct uses a hand-written failure state machine (F65); row 9 is a position paper;
+      row 10 evaluates offline with LTL/CTL (F11).
+- [x] **P1-4** Targeted re-read: survey (2602.06971) §4.4 runtime monitoring; Agia et al. 2024
+      (runtime monitoring of generative policies, CoRL). *2026-10-22:* §4.4 read (F69); Agia et al. abstract only
+      (consistency + VLM progress checks on diffusion policies; `docs/03` row 14).
+- [x] **P1-5** Inventory the Lean ecosystem: what Mathlib has for computability (`Primrec`, `Partrec`,
       Turing machines — *from memory, verify*), any LTL/temporal-logic or control libraries, any robotics
-      libraries. Do not assume; check.
-- [ ] **P1-6** Write the one-page **gap statement + differentiation matrix** in `docs/01-research-question.md`.
+      libraries. Do not assume; check. *2026-10-22:* F72, `docs/03` H. No temporal logic in Mathlib; CSLib has Büchi
+      automata and ω-regular languages; LeanLTL and Lentil for LTL; no control or robotics library found.
+- [x] **P1-6** Write the one-page **gap statement + differentiation matrix** in `docs/01-research-question.md`.
+      *2026-10-22:* done, with the K1 assessment and options for Gate G1.
 - [~] **P1-7** Check which benchmark/sim to use (SafeLIBERO appears in a snippet only): existence,
       license, ease of running. Record in `docs/03`. *2026-10-17:* LIBERO through LeRobot 0.6.1 chosen for the
-      first data collection (D-015); SafeLIBERO and LIBERO-plus not checked yet.
+      first data collection (D-015); SafeLIBERO and LIBERO-plus not checked yet. *2026-10-22:* existence and licenses
+      checked for LIBERO-PRO, LIBERO-plus, SafeLIBERO and LIBERO-Safety; LIBERO-Constrained (from STeP) not found
+      (F71, `docs/03` G). Remaining: ease of running (none installed yet).
 
 **Gate G1 (decision):** proceed / re-scope / stop, per kill criterion K1. Record in the decision log.
+*2026-10-22:* evidence ready; K1 does not force a stop, but C1 cannot be the main contribution (`docs/01`). Decision
+pending (Q12).
 
 ## Phase 2 — Specification language and monitor design
 
@@ -84,6 +103,8 @@ Open follow-ups:
 - [ ] **P2-3** Define the perception→labels interface (atoms, rates, latency budget) and A1 wording.
 - [ ] **P2-4** Resource model: define `horizon φ`; state a bound on residual size as a Hypothesis test
       first (`size(run φ tr) ≤ size φ * (horizon φ + 1)` is the candidate; **a constant per-step factor is false**).
+      *2026-10-22:* the candidate also fails when `always` is nested (linear growth, F73); restrict the fragment or
+      add normalisation first (`docs/04`, "Resource bound").
 - [ ] **P2-5** Spec library for pick-and-place: 6–10 specs, each with a natural-language description,
       a formula, and positive/negative traces as unit tests.
 - [ ] **P2-6** Complexity of complete early verdicts (can a residual still be satisfied?) for this fragment, with
@@ -145,6 +166,8 @@ Time box: if P3-3 is not done within the budget agreed in Q2, apply kill criteri
       bounds, a simple learned failure predictor as baseline, perception noise (P5-6).
 - [ ] **P5-9** Position the LIBERO-90 finding (F44) against LIBERO-PRO and LIBERO-Plus (F46, F47): read both
       papers in full; check whether π0.5 was evaluated anywhere under language or object perturbations.
+      *2026-10-22:* also AFI (F68), which detects and intervenes on a related "memory trap" with π0 and π0.5, and the
+      learned detectors that already use π0.5 on LIBERO (F66).
 
 **Gate G5:** if the monitor shows no measurable benefit over the baselines, apply K3 before writing.
 

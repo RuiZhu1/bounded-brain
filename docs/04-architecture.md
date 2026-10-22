@@ -82,6 +82,11 @@ and expire after at most `horizon φ` steps (sum of `X`-depth and bounds), so th
 `size(run φ tr) ≤ size φ · (horizon φ + 1)`. Empirical check so far (one spec, 5000 random steps): spec size 5, worst
 residual 8. To be stated precisely (P2-4) and proved (P3-5).
 
+This candidate fails when `always` is nested: an inner `G` never expires, and without deduplication every step adds a
+copy, so `G (G p)` grows from 3 to 1,203 nodes in 400 steps (F73, 2026-10-22). P2-4 must first restrict the fragment
+(no `always` under `always`) or add normalisation (e.g. deduplicating conjuncts), and the Lean and Python simplifiers
+must change together.
+
 ## Assumptions and guarantees
 
 * **A1 (perception).** The labels given to the monitor are correct for the atoms used.
@@ -91,7 +96,7 @@ residual 8. To be stated precisely (P2-4) and proved (P3-5).
 
 | ID | Guarantee | Depends on | Evidence |
 |---|---|---|---|
-| G1 | Monitor verdict = LTLf semantics; early verdicts sound | none beyond the definitions | Lean (P3-3, P3-4) — *not yet proved* |
+| G1 | Monitor verdict = LTLf semantics; early verdicts sound | none beyond the definitions | Lean (P3-3, P3-4) — proved 2026-10-18 (F49) |
 | G2 | Step cost and memory bounded by a function of the spec | none | Lean (P3-5) + tests — *open* |
 | G3 | Executed trace satisfies φ (enforcement) | A1, A3, A4 and a model of what the fallback can do | out of scope for the first paper; do not claim |
 
