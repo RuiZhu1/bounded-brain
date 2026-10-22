@@ -48,7 +48,7 @@ available (`TODO.md` §0). Personal and institutional context is kept out of the
 * `lake build` must pass. `sorry` only when tracked by a TODO ID in the docstring. No `axiom`.
 * Keep the core free of Mathlib unless a task needs it; record the decision in `docs/07`.
 * Toolchain pinned in `lean/lean-toolchain` (Lean v4.35.0, D-012). `lake build` is green with no
-  warnings (all stated theorems proved, 2026-10-18).
+  warnings (all stated theorems proved, 2026-10-18; bounded Until added and proved, 2026-10-23).
 * Python and Lean simplification rules must stay identical (TT/FF absorption only, no deduplication).
   `monitor/tests/test_lean_conformance.py` checks this against the Lean binary (`cd lean && lake build bbmon`).
 
@@ -99,6 +99,11 @@ available (`TODO.md` §0). Personal and institutional context is kept out of the
   LIBERO's assets are also in the LIBERO GitHub repo (405 MB). In the CPU-only cloud sandbox LIBERO runs with Mesa
   EGL, but `AsyncVectorEnv` workers die even without our logger. The Colab kit was tested there with a random-weight
   ACT policy; the real checkpoints are first loaded on Colab.
+* **Sessions on the owner's working machine** (since 2026-10-22, e.g. from the VS Code extension): a Linux host with
+  this repository as a normal git checkout. elan 4.2.4 and Lean v4.35.0 are installed in `~/.elan` (Q14, F75) and
+  `release.lean-lang.org` is reachable, so `cd lean && lake build` works directly. The default Python (3.14) has no
+  pytest: use a virtual environment (`python3 -m venv`, then `pip install pytest==9.1.1`). arXiv, Crossref, GitHub
+  and the Hugging Face docs pages were reachable from there.
 
 ## Definition of done (any task)
 

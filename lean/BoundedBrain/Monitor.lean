@@ -6,9 +6,10 @@ import BoundedBrain.Formula
   Mirrors `monitor/src/bounded_brain/monitor.py` (same simplification rules: only
   TT/FF absorption, NO deduplication).
 
-  STATUS (2026-10-18): compiles with Lean v4.35.0; the correctness theorems (TODO P3-2,
-  P3-3, P3-4) are proved, with no `sorry`. Open: the resource bound (P3-5) and the
-  bounded-verdict theorem (P3-8). Do not merge a `sorry` that is not listed in TODO.md.
+  STATUS (2026-10-23): compiles with Lean v4.35.0; the correctness theorems (TODO P3-2,
+  P3-3, P3-4) are proved, with no `sorry`, including bounded Until (P3-9). The bounded-verdict
+  theorem (P3-8) is in BoundedVerdict.lean. Open: the resource bound (P3-5). Do not merge a
+  `sorry` that is not listed in TODO.md.
 -/
 
 namespace BoundedBrain
@@ -43,6 +44,8 @@ def progress {AP : Type} (σ : Label AP) : Formula AP → Formula AP
   | .alwaysWithin (k + 1) φ => simpAnd (progress σ φ) (.alwaysWithin k φ)
   | .eventuallyWithin 0 φ => progress σ φ
   | .eventuallyWithin (k + 1) φ => simpOr (progress σ φ) (.eventuallyWithin k φ)
+  | .untilWithin 0 _ ψ => progress σ ψ
+  | .untilWithin (k + 1) φ ψ => simpOr (progress σ ψ) (simpAnd (progress σ φ) (.untilWithin k φ ψ))
 
 /-- Does the residual hold on the empty remaining trace? (LTLf end-of-trace.) -/
 def acceptsEmpty {AP : Type} : Formula AP → Bool
@@ -56,6 +59,7 @@ def acceptsEmpty {AP : Type} : Formula AP → Bool
   | .always _ => true
   | .alwaysWithin _ _ => true
   | .eventuallyWithin _ _ => false
+  | .untilWithin _ _ _ => false
 
 /-- Fold `progress` over a whole trace; returns the final residual. -/
 def run {AP : Type} (φ : Formula AP) (tr : Trace AP) : Formula AP :=
@@ -106,8 +110,19 @@ theorem sat_shift {AP : Type} (σ : Label AP) (tr : Trace AP) (φ : Formula AP) 
       exact ⟨j', by omega, by omega, by omega, (ih j').mp hs⟩
     · rintro ⟨j, hij, hjk, hj, hs⟩
       exact ⟨j + 1, by omega, by omega, by omega, (ih j).mpr hs⟩
+  | untilWithin k φ ψ ihφ ihψ =>
+    simp only [Sat, List.length_cons]
+    constructor
+    · rintro ⟨j, hij, hjk, hj, hs, hφ⟩
+      obtain ⟨j', rfl⟩ : ∃ j', j = j' + 1 := ⟨j - 1, by omega⟩
+      refine ⟨j', by omega, by omega, by omega, (ihψ j').mp hs, fun m hm hmj => ?_⟩
+      exact (ihφ m).mp (hφ (m + 1) (by omega) (by omega))
+    · rintro ⟨j, hij, hjk, hj, hs, hφ⟩
+      refine ⟨j + 1, by omega, by omega, by omega, (ihψ j).mpr hs, fun m hm hmj => ?_⟩
+      obtain ⟨m', rfl⟩ : ∃ m', m = m' + 1 := ⟨m - 1, by omega⟩
+      exact (ihφ m').mpr (hφ m' (by omega) (by omega))
 
-/-- [P3-2] Simplification preserves semantics. Proof: case split on the two arguments (100 cases, each closed
+/-- [P3-2] Simplification preserves semantics. Proof: case split on the two arguments (144 cases, each closed
 by unfolding `simpAnd` and `Sat`). -/
 theorem simpAnd_sat {AP : Type} (tr : Trace AP) (a b : Formula AP) (i : Nat) :
     Sat tr (simpAnd a b) i ↔ Sat tr a i ∧ Sat tr b i := by
@@ -127,6 +142,8 @@ Proof: induction on `φ`.
   * `pending ψ`: LHS = `0 < len+1 ∧ Sat (σ::tr) ψ 0`; RHS = `Sat tr (progress σ ψ) 0`; use IH.
   * `always ψ`, `alwaysWithin (k+1) ψ`, `eventuallyWithin (k+1) ψ`: split the quantified
     index at 0 (IH) and `j + 1` (`sat_shift`); `simpAnd_sat` / `simpOr_sat` for the glue.
+  * `untilWithin (k+1) φ ψ`: the witness is 0 (ψ holds now, IH on ψ) or `j + 1` (φ holds now, IH on φ,
+    and the rest is the until with bound k, via `sat_shift` for both arguments).
   * bound 0 cases reduce to IH on ψ. -/
 theorem progress_sat {AP : Type} (σ : Label AP) (tr : Trace AP) (φ : Formula AP) :
     Sat (σ :: tr) φ 0 ↔ Sat tr (progress σ φ) 0 := by
@@ -204,6 +221,36 @@ theorem progress_sat {AP : Type} (σ : Label AP) (tr : Trace AP) (φ : Formula A
       · rintro (h0 | ⟨j, _, hjk, hj, hs⟩)
         · exact ⟨0, by omega, by omega, by omega, h0⟩
         · exact ⟨j + 1, by omega, by omega, by omega, (sat_shift σ tr φ j).mpr hs⟩
+  | untilWithin k φ ψ ihφ ihψ =>
+    cases k with
+    | zero =>
+      simp only [progress]
+      rw [← ihψ]
+      simp only [Sat, List.length_cons]
+      constructor
+      · rintro ⟨j, _, hj0, _, hs, _⟩
+        obtain rfl : j = 0 := by omega
+        exact hs
+      · intro h
+        exact ⟨0, by omega, by omega, by omega, h, fun m _ hm0 => absurd hm0 (by omega)⟩
+    | succ k =>
+      simp only [progress]
+      rw [simpOr_sat, simpAnd_sat, ← ihψ, ← ihφ]
+      simp only [Sat, List.length_cons]
+      constructor
+      · rintro ⟨j, _, hjk, hj, hs, hφ⟩
+        cases j with
+        | zero => exact Or.inl hs
+        | succ j =>
+          refine Or.inr ⟨hφ 0 (by omega) (by omega), j, by omega, by omega, by omega,
+            (sat_shift σ tr ψ j).mp hs, fun m _ hmj => ?_⟩
+          exact (sat_shift σ tr φ m).mp (hφ (m + 1) (by omega) (by omega))
+      · rintro (h0 | ⟨h0, j, _, hjk, hj, hs, hφ⟩)
+        · exact ⟨0, by omega, by omega, by omega, h0, fun m _ hm0 => absurd hm0 (by omega)⟩
+        · refine ⟨j + 1, by omega, by omega, by omega, (sat_shift σ tr ψ j).mpr hs, fun m _ hmj => ?_⟩
+          cases m with
+          | zero => exact h0
+          | succ m => exact (sat_shift σ tr φ m).mpr (hφ m (by omega) (by omega))
 
 /-- [P3-2] End-of-trace acceptance agrees with the semantics on the empty trace. -/
 theorem acceptsEmpty_iff {AP : Type} (φ : Formula AP) :

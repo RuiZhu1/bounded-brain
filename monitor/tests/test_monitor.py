@@ -27,6 +27,7 @@ from bounded_brain import (
     Monitor,
     Next,
     Or,
+    UntilWithin,
     Verdict,
     accepts,
     atom,
@@ -69,6 +70,12 @@ FORMULAS: List[Formula] = [
     AlwaysWithin(0, Next(atom(A))),
     Always(Always(implies(A, B))),
     And(Next(atom(A)), Next(not_atom(A))),
+    UntilWithin(0, atom(A), atom(B)),
+    UntilWithin(2, atom(A), atom(B)),
+    UntilWithin(3, not_atom(B), atom(A)),  # no b before a, and a within 4 steps (an ordering rule)
+    UntilWithin(1, atom(A), Next(atom(B))),
+    UntilWithin(2, EventuallyWithin(1, atom(B)), Always(atom(A))),
+    Always(Or(not_atom(A), UntilWithin(1, atom(A), atom(B)))),  # G (a -> a U[0,1] b)
 ]
 
 
@@ -109,9 +116,32 @@ def test_bound_validation() -> None:
         AlwaysWithin(-1, atom(A))
     with pytest.raises(ValueError):
         EventuallyWithin(-1, atom(A))
+    with pytest.raises(ValueError):
+        UntilWithin(-1, atom(A), atom(B))
+
+
+def test_until_is_strong_and_bounded() -> None:
+    phi = UntilWithin(2, atom(A), atom(B))
+    assert accepts(phi, []) is False  # the step where b holds must exist
+    assert accepts(phi, [frozenset([A])]) is False  # a held, but b never came
+    assert accepts(phi, [frozenset([B])]) is True  # b at once: a is not needed
+    assert accepts(phi, [frozenset([A]), frozenset([A]), frozenset([B])]) is True
+    assert accepts(phi, [frozenset([A])] * 3 + [frozenset([B])]) is False  # b came one step too late
+    assert accepts(phi, [frozenset(), frozenset([B])]) is False  # a failed before b
 
 
 # ----------------------------- robot-flavoured specs ------------------------ #
+
+
+def test_open_drawer_before_placing() -> None:
+    # "Do not place the bowl before the drawer is open; open it within 3 steps."
+    spec = UntilWithin(3, not_atom("place"), atom("drawer_open"))
+    m = Monitor(spec)
+    assert m.step({"approach"}) is Verdict.PENDING
+    assert m.step({"drawer_open"}) is Verdict.SATISFIED
+    m2 = Monitor(spec)
+    assert m2.step({"approach"}) is Verdict.PENDING
+    assert m2.step({"place"}) is Verdict.VIOLATED  # placed while the drawer was closed
 
 
 def test_lift_requires_stable_grasp() -> None:

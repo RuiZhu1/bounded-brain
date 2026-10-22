@@ -10,6 +10,7 @@ from bounded_brain import (
     Next,
     Or,
     Pending,
+    UntilWithin,
     atom,
     conj,
     disj,
@@ -27,8 +28,14 @@ def test_roundtrip_user_formulas() -> None:
         EventuallyWithin(10, atom("released")),
         AlwaysWithin(3, not_atom("collision")),
         Next(Or(atom("a"), not_atom("b"))),
+        UntilWithin(5, not_atom("place"), atom("drawer_open")),
     )
     assert from_dict(to_dict(phi)) == phi
+    assert to_dict(UntilWithin(2, atom("a"), atom("b"))) == {
+        "op": "until_within", "bound": 2,
+        "left": {"op": "lit", "name": "a", "positive": True},
+        "right": {"op": "lit", "name": "b", "positive": True},
+    }
 
 
 def test_internal_constructor_is_rejected_in_user_specs() -> None:

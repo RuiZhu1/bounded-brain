@@ -4,12 +4,14 @@ Lean 4 project `BoundedBrain`. Goal: prove that the progression monitor agrees w
 reference LTLf semantics (and that early verdicts are sound). This is the formal building block of
 the project (see `../TODO.md`, Phase 3); since the re-scope of 2026-10-22 (D-028) it is not the main
 contribution, because verified progression monitors already exist (`../docs/01-research-question.md`).
-Next on the critical path: bounded Until (P3-9) and a resource bound (P3-5).
+Next on the critical path: a resource bound (P3-5).
 
-## Status (2026-10-18)
+## Status (2026-10-23)
 
 * **All stated theorems are proved.** `lake build` (Lean `v4.35.0`, D-012) is green with no warnings and no
   `sorry`; `#print axioms` lists only Lean's standard axioms (`propext`, `Classical.choice`, `Quot.sound`).
+* The fragment includes bounded Until `φ U[0,k] ψ` (`Formula.untilWithin`, P3-9, D-029, 2026-10-23); every theorem
+  below covers it.
 * `Monitor.lean`: `sat_shift`, `simpAnd_sat`, `simpOr_sat`, `progress_sat`, `acceptsEmpty_iff` (P3-2),
   `accepts_iff_sat` (P3-3, main theorem), `violated_sound`, `satisfied_sound` (P3-4).
 * `BoundedVerdict.lean`: `bounded_verdict` and `verdict_final` (P3-8).

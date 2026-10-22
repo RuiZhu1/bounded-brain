@@ -7,7 +7,8 @@ import BoundedBrain
   Used for differential testing against the Python monitor (monitor/tests/test_lean_conformance.py,
   experiments/analysis/lean_conformance.py). Formulas use the JSON form of `spec.to_dict` in Python:
   {"op": "tt" | "ff" | "lit" | "and" | "or" | "next" | "pending" | "always" | "always_within" |
-  "eventually_within", ...}. A trace is a list of labels; a label is the list of atom names that hold.
+  "eventually_within" | "until_within", ...}. A trace is a list of labels; a label is the list of atom names
+  that hold.
 
     lake exe bbmon batch CASES.jsonl
         one JSON object per line, {"id": ..., "specs": [F, ...], "trace": [[...], ...]};
@@ -44,6 +45,7 @@ partial def formulaOfJson (j : Json) : Except String (Formula String) := do
   | "always" => pure (.always (← sub "arg"))
   | "always_within" => pure (.alwaysWithin (← j.getObjValAs? Nat "bound") (← sub "arg"))
   | "eventually_within" => pure (.eventuallyWithin (← j.getObjValAs? Nat "bound") (← sub "arg"))
+  | "until_within" => pure (.untilWithin (← j.getObjValAs? Nat "bound") (← sub "left") (← sub "right"))
   | other => throw s!"unknown op: {other}"
 
 def formulaToJson : Formula String → Json
@@ -57,6 +59,8 @@ def formulaToJson : Formula String → Json
   | .always a => Json.mkObj [("op", "always"), ("arg", formulaToJson a)]
   | .alwaysWithin k a => Json.mkObj [("op", "always_within"), ("bound", toJson k), ("arg", formulaToJson a)]
   | .eventuallyWithin k a => Json.mkObj [("op", "eventually_within"), ("bound", toJson k), ("arg", formulaToJson a)]
+  | .untilWithin k a b =>
+    Json.mkObj [("op", "until_within"), ("bound", toJson k), ("left", formulaToJson a), ("right", formulaToJson b)]
 
 /-- A label from the list of atoms that hold. -/
 def labelOf (atoms : Array String) : Label String := fun p => atoms.contains p

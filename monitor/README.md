@@ -6,7 +6,7 @@ twin of the Lean development in `../lean/` and the oracle for differential testi
 ```bash
 cd monitor
 python3 -m pip install -e ".[dev]"   # or: uv run --with pytest pytest
-python3 -m pytest -q                  # 53 tests at the time of writing
+python3 -m pytest -q                  # 71 tests on 2026-10-23; 2 are skipped without the Lean executable
 ```
 
 ## Example
@@ -21,14 +21,22 @@ m = Monitor(lift_safety)
 m.step({"approach"})                       # Verdict.PENDING
 m.step({"lift_cmd", "grasp_stable"})       # Verdict.PENDING
 m.step({"lift_cmd"})                       # Verdict.VIOLATED  (no stable grasp)
+
+# An ordering rule with bounded Until: "do not place before the drawer is open; open it within 3 steps".
+from bounded_brain import UntilWithin, not_atom
+order = Monitor(UntilWithin(3, not_atom("place"), atom("drawer_open")))
+order.step({"approach"})                   # Verdict.PENDING
+order.step({"place"})                      # Verdict.VIOLATED  (placed while the drawer was closed)
 ```
 
 ## What is tested
 
 * `holds` (in `spec.py`) is a deliberately naive LTLf oracle.
 * `tests/test_monitor.py` checks, exhaustively on all traces up to length 5 over two atoms and
-  20 formulas, that the monitor's end-of-trace answer equals the oracle, and that early
+  26 formulas (bounded Until included), that the monitor's end-of-trace answer equals the oracle, and that early
   `VIOLATED`/`SATISFIED` verdicts are sound for all short extensions.
+* `tests/test_bounded_verdict.py` checks the bounded-verdict property; `tests/test_lean_conformance.py` compares the
+  monitor with the Lean executable (`../lean/BBMon.lean`) step by step.
 * A regression test guards the classic strong-`Next` progression bug (see
   `../docs/04-architecture.md`, "Pending").
 
@@ -38,3 +46,5 @@ m.step({"lift_cmd"})                       # Verdict.VIOLATED  (no stable grasp)
   simplified to `FF`. The end-of-trace answer is exact.
 * Labels (which atoms are true) are an input. The monitor says nothing about whether
   perception produced them correctly (assumption A1).
+* Memory is not yet bounded by the spec alone: with `Always` nested inside `Always`, the residual grows with the
+  trace (`../docs/04-architecture.md`, "Resource bound"; TODO P2-4).

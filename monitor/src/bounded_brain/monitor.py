@@ -14,8 +14,9 @@ Properties we want (and will prove in Lean, see lean/BoundedBrain/Monitor.lean):
      (NOT claimed complete: a residual may be unsatisfiable without having
       been simplified to FF. See docs/04-architecture.md.)
   3. `step` is a total function that always terminates (structural recursion on
-     the formula; bounded operators count down), with memory bounded by a
-     function of the spec size.
+     the formula; bounded operators count down). Memory bounded by a function of
+     the spec is the goal but does NOT hold yet: with nested `Always` the residual
+     grows with the trace (docs/04-architecture.md, "Resource bound"; TODO P2-4).
 
 The simplification rules here must be IDENTICAL to the Lean ones (no
 deduplication, only the TT/FF absorption rules) so the two stay in lockstep.
@@ -40,6 +41,7 @@ from .spec import (
     Or,
     Pending,
     Trace,
+    UntilWithin,
 )
 
 
@@ -93,6 +95,13 @@ def progress(label: Label, phi: Formula) -> Formula:
         if phi.bound == 0:
             return progress(label, phi.arg)
         return simp_or(progress(label, phi.arg), EventuallyWithin(phi.bound - 1, phi.arg))
+    if isinstance(phi, UntilWithin):
+        if phi.bound == 0:
+            return progress(label, phi.right)
+        return simp_or(
+            progress(label, phi.right),
+            simp_and(progress(label, phi.left), UntilWithin(phi.bound - 1, phi.left, phi.right)),
+        )
     raise TypeError(f"not a formula: {phi!r}")
 
 
@@ -112,7 +121,7 @@ def accepts_empty(phi: Formula) -> bool:
         return False
     if isinstance(phi, (Always, AlwaysWithin)):
         return True
-    if isinstance(phi, EventuallyWithin):
+    if isinstance(phi, (EventuallyWithin, UntilWithin)):
         return False
     raise TypeError(f"not a formula: {phi!r}")
 
@@ -129,7 +138,7 @@ def size(phi: Formula) -> int:
     """Number of nodes; the memory proxy for the monitor state."""
     if isinstance(phi, (TT, FF, Lit)):
         return 1
-    if isinstance(phi, (And, Or)):
+    if isinstance(phi, (And, Or, UntilWithin)):
         return 1 + size(phi.left) + size(phi.right)
     return 1 + size(phi.arg)  # Next, Pending, Always, AlwaysWithin, EventuallyWithin
 

@@ -34,6 +34,7 @@ from bounded_brain import (
     Monitor,
     Next,
     Or,
+    UntilWithin,
     accepts,
     size,
     to_dict,
@@ -105,12 +106,14 @@ def small_formulas() -> List[Formula]:
         one += [AlwaysWithin(k, f) for k in (0, 1, 2)] + [EventuallyWithin(k, f) for k in (0, 1, 2)]
     one += [And(f, g) for f, g in itertools.product(base, base)]
     one += [Or(f, g) for f, g in itertools.product(base, base)]
+    one += [UntilWithin(k, f, g) for f, g in itertools.product(base, base) for k in (0, 1, 2)]
     two: List[Formula] = []
     for f in one:
         two += [Next(f), Always(f), AlwaysWithin(1, f), EventuallyWithin(2, f)]
     pairs = [Next(Lit("a")), Always(Lit("b")), EventuallyWithin(1, Lit("a"))] + base
     two += [And(f, g) for f, g in itertools.product(pairs, pairs)]
     two += [Or(f, g) for f, g in itertools.product(pairs, pairs)]
+    two += [UntilWithin(1, f, g) for f, g in itertools.product(pairs, pairs)]
     return one + two
 
 
@@ -126,9 +129,11 @@ def random_formula(rng: random.Random, depth: int) -> Formula:
     if depth == 0 or rng.random() < 0.25:
         r = rng.random()
         return TT() if r < 0.1 else FF() if r < 0.2 else Lit(rng.choice(atoms), rng.random() < 0.7)
-    op = rng.choice(["and", "or", "next", "always", "always_within", "eventually_within"])
+    op = rng.choice(["and", "or", "next", "always", "always_within", "eventually_within", "until_within"])
     if op == "and":
         return And(random_formula(rng, depth - 1), random_formula(rng, depth - 1))
+    if op == "until_within":
+        return UntilWithin(rng.randint(0, 4), random_formula(rng, depth - 1), random_formula(rng, depth - 1))
     if op == "or":
         return Or(random_formula(rng, depth - 1), random_formula(rng, depth - 1))
     if op == "next":

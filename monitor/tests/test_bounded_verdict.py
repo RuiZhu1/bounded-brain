@@ -4,6 +4,7 @@ For formulas without the unbounded `Always`, define the verdict depth
 
     d(tt) = d(ff) = d(literal) = 1          d(X f) = 1 + d(f)
     d(G[0,k] f) = d(F[0,k] f) = k + d(f)    d(f & g) = d(f | g) = max(d(f), d(g))
+    d(f U[0,k] g) = k + max(d(f), d(g))
 
 Claim: after any d(f) steps the residual is TT or FF, so the monitor has reached a definite
 verdict; the time to a verdict is a bounded minimization (docs/05-course-mapping.md). These are
@@ -16,7 +17,8 @@ from __future__ import annotations
 import itertools
 from typing import Iterator, List
 
-from bounded_brain import FF, TT, And, AlwaysWithin, EventuallyWithin, Formula, Lit, Next, Or, run
+from bounded_brain import (FF, TT, And, AlwaysWithin, EventuallyWithin, Formula, Lit, Next, Or, UntilWithin,
+                           run)
 
 ATOMS = ("a", "b")
 LABELS = [frozenset(c) for r in range(len(ATOMS) + 1) for c in itertools.combinations(ATOMS, r)]
@@ -32,6 +34,8 @@ def verdict_depth(f: Formula) -> int:
         return f.bound + verdict_depth(f.arg)
     if isinstance(f, (And, Or)):
         return max(verdict_depth(f.left), verdict_depth(f.right))
+    if isinstance(f, UntilWithin):
+        return f.bound + max(verdict_depth(f.left), verdict_depth(f.right))
     raise TypeError(f"not in the always-free fragment: {f!r}")
 
 
@@ -51,6 +55,7 @@ def _formulas(depth: int) -> List[Formula]:
     small = _formulas(depth - 1) if depth == 1 else base + [Next(x) for x in _literals()]
     for f, g in itertools.product(small, small):
         out += [And(f, g), Or(f, g)]
+        out += [UntilWithin(k, f, g) for k in (0, 1, 2)]
     return out
 
 

@@ -6,7 +6,7 @@ Design rules (see docs/04-architecture.md):
   label is the set of atomic propositions that hold at one control step.
 * Negation only on atoms (`Lit(name, positive=False)`), so formulas are in NNF.
 * Every temporal operator is either structural (`Next`, `Always`) or *bounded*
-  (`AlwaysWithin`, `EventuallyWithin`). There is no unbounded search anywhere.
+  (`AlwaysWithin`, `EventuallyWithin`, `UntilWithin`). There is no unbounded search anywhere.
   This mirrors bounded quantification / bounded minimisation from the course
   (see docs/05-course-mapping.md) and keeps monitor cost statically known.
 * `Pending` is an INTERNAL constructor produced by progression. Never write it
@@ -102,7 +102,21 @@ class EventuallyWithin:
             raise ValueError("bound must be >= 0")
 
 
-Formula = Union[TT, FF, Lit, And, Or, Next, Pending, Always, AlwaysWithin, EventuallyWithin]
+@dataclass(frozen=True)
+class UntilWithin:
+    """left U[0,bound] right (strong): `right` holds at some remaining step among the next bound+1,
+    and `left` holds at every step before that one."""
+
+    bound: int
+    left: "Formula"
+    right: "Formula"
+
+    def __post_init__(self) -> None:
+        if self.bound < 0:
+            raise ValueError("bound must be >= 0")
+
+
+Formula = Union[TT, FF, Lit, And, Or, Next, Pending, Always, AlwaysWithin, EventuallyWithin, UntilWithin]
 
 
 # --------------------------------------------------------------------------- #
@@ -179,6 +193,11 @@ def holds(trace: Trace, i: int, phi: Formula) -> bool:
         return all(holds(trace, j, phi.arg) for j in range(i, min(i + phi.bound, n - 1) + 1))
     if isinstance(phi, EventuallyWithin):
         return any(holds(trace, j, phi.arg) for j in range(i, min(i + phi.bound, n - 1) + 1))
+    if isinstance(phi, UntilWithin):
+        return any(
+            holds(trace, j, phi.right) and all(holds(trace, m, phi.left) for m in range(i, j))
+            for j in range(i, min(i + phi.bound, n - 1) + 1)
+        )
     raise TypeError(f"not a formula: {phi!r}")
 
 
@@ -208,6 +227,9 @@ def to_dict(phi: Formula) -> Dict[str, Any]:
         return {"op": "always_within", "bound": phi.bound, "arg": to_dict(phi.arg)}
     if isinstance(phi, EventuallyWithin):
         return {"op": "eventually_within", "bound": phi.bound, "arg": to_dict(phi.arg)}
+    if isinstance(phi, UntilWithin):
+        return {"op": "until_within", "bound": phi.bound, "left": to_dict(phi.left),
+                "right": to_dict(phi.right)}
     raise TypeError(f"not a formula: {phi!r}")
 
 
@@ -242,4 +264,10 @@ def from_dict(data: Dict[str, Any], *, allow_internal: bool = False) -> Formula:
         return AlwaysWithin(int(data["bound"]), from_dict(data["arg"], allow_internal=allow_internal))
     if op == "eventually_within":
         return EventuallyWithin(int(data["bound"]), from_dict(data["arg"], allow_internal=allow_internal))
+    if op == "until_within":
+        return UntilWithin(
+            int(data["bound"]),
+            from_dict(data["left"], allow_internal=allow_internal),
+            from_dict(data["right"], allow_internal=allow_internal),
+        )
     raise ValueError(f"unknown op: {op!r}")

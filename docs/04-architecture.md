@@ -4,7 +4,8 @@ Status: **design draft** — freeze in Phase 2 (P2-1).
 
 *Re-scoped 2026-10-22 (D-028):* the monitor is the assured component of a run-time-assurance loop around the VLA
 (π0.5 in LIBERO). In the diagram below, the continuous filter is optional context, and "hold / retreat" becomes the
-intervention, to be designed in P2-8. The fragment gains bounded Until (P2-1) and must keep residuals bounded (P2-4).
+intervention, to be designed in P2-8. The fragment gained bounded Until on 2026-10-23 (P3-9, D-029) and must keep
+residuals bounded (P2-4).
 
 ## System view
 
@@ -33,18 +34,22 @@ intervention, to be designed in P2-8. The fragment gains bounded Until (P2-1) an
     | G φ                         -- always (over the rest of the finite trace)
     | G[0,k] φ                    -- always within the next k+1 steps
     | F[0,k] φ                    -- eventually within the next k+1 steps
+    | φ U[0,k] ψ                  -- ψ within the next k+1 steps, φ at every step before it (strong)
 ```
 
 Internal only: `pending φ` ("a step exists here and φ holds at it"), produced by progression.
 
 Why this shape: **every operator is structural or bounded**, so the monitor step is a total function with no
-unbounded search. Bounded `G[0,k]`/`F[0,k]` are bounded quantifiers over a window of the trace (cf. course Lecture 2).
-Unbounded `F`/`U` are omitted on purpose; add bounded `U[0,k]` only if the spec library (P2-5) needs it.
+unbounded search. Bounded `G[0,k]`/`F[0,k]`/`U[0,k]` are bounded quantifiers over a window of the trace (cf. course
+Lecture 2). Unbounded `F`/`U` are omitted on purpose. Bounded `U[0,k]` was added on 2026-10-23 for ordering rules such
+as "do not place the bowl before the drawer is open" (`¬place U[0,k] drawer_open`; P3-9, D-029). It is strong: a step
+where ψ holds must exist within the window. A weak variant (`φ W ψ`) is not in the fragment; add it only if the spec
+library (P2-5) needs it.
 
 ## Semantics (LTLf, reference)
 
 Trace = finite list of labels. `holds(trace, i, φ)` / Lean `Sat tr φ i`. Positions at/after the end satisfy
-nothing that needs a step (literals, `X`, `pending`, `F[0,k]`) and satisfy vacuous universals (`G`, `G[0,k]`).
+nothing that needs a step (literals, `X`, `pending`, `F[0,k]`, `U[0,k]`) and satisfy vacuous universals (`G`, `G[0,k]`).
 Code: `monitor/src/bounded_brain/spec.py` and `lean/BoundedBrain/Formula.lean`.
 
 ## Monitor by formula progression
@@ -60,9 +65,10 @@ Code: `monitor/src/bounded_brain/spec.py` and `lean/BoundedBrain/Formula.lean`.
 | `G φ` | `simpAnd (progress σ φ) (G φ)` |
 | `G[0,k] φ` | `k=0`: `progress σ φ`; else `simpAnd (progress σ φ) (G[0,k-1] φ)` |
 | `F[0,k] φ` | `k=0`: `progress σ φ`; else `simpOr (progress σ φ) (F[0,k-1] φ)` |
+| `φ U[0,k] ψ` | `k=0`: `progress σ ψ`; else `simpOr (progress σ ψ) (simpAnd (progress σ φ) (φ U[0,k-1] ψ))` |
 
 End of trace: `acceptsEmpty` = `tt`→true, `ff`→false, literals→false, `X`/`pending`→false, `G`/`G[0,k]`→true,
-`F[0,k]`→false, `∧`/`∨` compositional. Early verdicts: residual `ff` ⇒ VIOLATED, `tt` ⇒ SATISFIED.
+`F[0,k]`/`U[0,k]`→false, `∧`/`∨` compositional. Early verdicts: residual `ff` ⇒ VIOLATED, `tt` ⇒ SATISFIED.
 
 ### Design note: why `pending` exists (a bug we caught)
 
@@ -107,5 +113,6 @@ must change together.
 ## Interchange format (Lean ↔ Python differential tests)
 
 * Formula: `spec.to_dict` JSON, e.g. `{"op":"always","arg":{"op":"or","left":{"op":"lit","name":"lift_cmd","positive":false},"right":{"op":"lit","name":"grasp_stable","positive":true}}}`.
+  Bounded Until: `{"op":"until_within","bound":k,"left":φ,"right":ψ}`.
 * Trace: JSONL, one object per step: `{"t": 0, "labels": ["grasp_stable"]}`.
 * Output: JSONL of `{"t": n, "verdict": "pending|satisfied|violated"}` plus a final `{"accepts": true|false}`.

@@ -2,7 +2,7 @@
 
 Conventions: `[ ]` open · `[~]` in progress · `[x]` done · **Gate** = a decision point (see
 `docs/06-risks-and-kill-criteria.md`). IDs (`P3-3`) are referenced from code (`sorry` tags) and docs.
-Update this file in the same change as the work. Last reviewed: 2026-10-22 (Phase 1 literature check; Gate G1: option (b), D-028).
+Update this file in the same change as the work. Last reviewed: 2026-10-23 (bounded Until, P3-9; Lean installed on the owner's machine).
 
 ## 0. Questions for the owner
 
@@ -35,20 +35,22 @@ Open follow-ups:
 - [ ] **Q13** Compute for option (b). Online π0.5 runs (P5-5), new rollouts that log VLA features for the learned
       detectors (P5-10) and counterfactual branches (P5-11) need GPU time. How many Colab units (or other GPUs) are
       available, and from when? Everything up to P2-5 and P5-8 runs offline on the existing traces.
-- [ ] **Q14** Lean on the working machine. P3-9 and P3-5 change the Lean proofs, which need a local `lake build`
+- [x] **Q14** Lean on the working machine. P3-9 and P3-5 change the Lean proofs, which need a local `lake build`
       (or a push to CI). May an agent install elan and Lean v4.35.0 (about 3 GB, in `~/.elan`) on the machine that
-      holds this repository? That would also finish P0-2.
+      holds this repository? That would also finish P0-2. → Yes; installed on 2026-10-23 (F75).
 
 ## Phase 0 — Orientation and environment (first session)
 
 - [ ] **P0-1** Read `CLAUDE.md`, all of `docs/`. Skim `monitor/` and `lean/`.
-- [~] **P0-2** Install Lean 4 via `elan` on the owner's machine.
+- [x] **P0-2** Install Lean 4 via `elan` on the owner's machine.
       Make `cd lean && lake build` succeed (the skeleton was written without a compiler). Pin
       `lean-toolchain` to an exact version; log it in `docs/07-decision-log.md`.
       *2026-10-17:* pinned to `leanprover/lean4:v4.35.0` (D-012); `lake build` green in the agent's cloud sandbox
-      with no source fixes needed (8 tracked `sorry` warnings, no errors). **Remaining:** the owner installs elan on
-      their own system (`lean/README.md`) and runs `lake build` once; agents cannot install software there.
-- [~] **P0-3** `cd monitor && python3 -m pytest -q` green on the owner's own Python. *2026-10-18:* CI runs the tests on
+      with no source fixes needed (8 tracked `sorry` warnings, no errors). *2026-10-23:* elan 4.2.4 and v4.35.0
+      installed on the owner's working machine at the owner's request (Q14); `lake build --wfail` green (F75).
+- [~] **P0-3** `cd monitor && python3 -m pytest -q` green on the owner's own Python. *2026-10-23:* the owner's machine
+      has Python 3.14 without pytest; in a virtual environment with pytest 9.1.1 all 71 tests pass, including the Lean
+      conformance tests (F74). *2026-10-18:* CI runs the tests on
       Python 3.10–3.14 on every push (57 tests, including the Lean conformance tests). *2026-10-17:* 53 passed on
       Python 3.10.12 in the agent's device VM (no pytest installed there; ran
       `uv run --no-project --with pytest -- python -m pytest -q`); also passed on 3.10 and 3.13 in the scaffolding
@@ -110,7 +112,8 @@ by the owner: option (b) (Q12, D-028).
 Goal: a machine-checked monitor as the assured component of a run-time-assurance loop around π0.5 in LIBERO
 (`docs/01`, "Gate G1"). Order of work; steps 1–4 need no GPU.
 
-1. Bounded Until in the fragment, in Python and Lean together, with all theorems re-proved (P2-1, P3-9). Needs Q14.
+1. Bounded Until in the fragment, in Python and Lean together, with all theorems re-proved (P2-1, P3-9).
+   **Done 2026-10-23** (F74, D-029).
 2. Residuals that stay bounded, and the bound proved (P2-4, P3-5; fixes F73).
 3. Spec library from the LIBERO task goals with ordering, response and "after X, never Y" rules, evaluated offline
    on the existing 4,062 episodes (P2-5, P5-8).
@@ -127,7 +130,7 @@ Off the critical path since D-028: P2-6, P3-6, P5-4.
 
 - [ ] **P2-1** Freeze the fragment (grammar in `docs/04`). Decide on bounded `Until`, weak next.
       *2026-10-22 (D-028):* add strong bounded Until `φ U[0,k] ψ` (ordering rules need it); weak next only if P2-5
-      needs it. Critical path, step 1.
+      needs it. Critical path, step 1. *2026-10-23:* bounded Until added (P3-9, D-029); freeze after P2-5.
 - [ ] **P2-2** Early verdicts: stay sound-only, or add a residual satisfiability check for completeness?
 - [ ] **P2-3** Define the perception→labels interface (atoms, rates, latency budget) and A1 wording.
 - [ ] **P2-4** Resource model: define `horizon φ`; state a bound on residual size as a Hypothesis test
@@ -173,10 +176,12 @@ Off the critical path since D-028: P2-6, P3-6, P5-4.
       formulas). Links bounded minimization to monitorability and to the learnability result F32.
       *Proved 2026-10-18:* `lean/BoundedBrain/BoundedVerdict.lean` (`bounded_verdict`; `verdict_final` adds that
       the verdict is then correct for every continuation of the trace).
-- [ ] **P3-9** Bounded Until (after P2-1): extend `Formula`, `Sat`, `progress`, `acceptsEmpty` in Lean and Python
+- [x] **P3-9** Bounded Until (after P2-1): extend `Formula`, `Sat`, `progress`, `acceptsEmpty` in Lean and Python
       together (`φ U[0,0] ψ ↦ progress ψ`; `φ U[0,k+1] ψ ↦ simpOr (progress ψ) (simpAnd (progress φ) (φ U[0,k] ψ))`;
       not accepted on the empty trace); re-prove every theorem, with verdict depth `k + max (d φ) (d ψ)`; extend
       `Checks.lean`, `bbmon`, `spec.to_dict` and the exhaustive and conformance tests. Needs Q14. Critical path, step 1.
+      *Done 2026-10-23 (F74, D-029):* all theorems cover `untilWithin`; `Checks.lean` needed no change (its statements
+      quantify over every formula); conformance on 120,105 exhaustive + 4,000 random cases and all LIBERO pairs.
 - [ ] **P3-10** Atom definitions in Lean (after P2-7).
 
 Time box: if P3-3 is not done within the budget agreed in Q2, apply kill criterion K2.
@@ -187,6 +192,7 @@ Time box: if P3-3 is not done within the budget agreed in Q2, apply kill criteri
 - [x] **P4-2** Differential test: Hypothesis-generated formulas/traces → Python vs. Lean executable.
       *Done 2026-10-18 without Hypothesis:* `monitor/tests/test_lean_conformance.py` (67,320 exhaustive small
       cases + 4,000 seeded random ones) and all 16,248 LIBERO (episode, spec) pairs; 0 mismatches (F50).
+      *2026-10-23:* with bounded Until, 120,105 exhaustive + 4,000 random cases; LIBERO pairs again 0 mismatches (F74).
 - [~] **P4-3** Latency benchmark (µs/step). Targets to compare against: VLA chunk rate (~15 Hz) and filter
       rate (50–60 Hz) as reported in the ATACOM paper. *Indicative only:* the Lean binary did 3.67 M monitor
       steps in 1.9 s including JSON parsing (cloud sandbox, F50); a proper per-step benchmark is still to do.

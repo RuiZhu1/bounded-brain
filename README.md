@@ -45,10 +45,10 @@ verdict is correct with respect to the specification. See
 
 1. **C1 — Verified monitor (a building block, not the main claim).** A bounded LTLf fragment, a progression
    monitor, and Lean proofs of end-of-trace correctness, sound early verdicts and bounded verdicts. **Done** for the
-   current fragment ([`lean/`](lean/)). **Next:** bounded Until (needed for ordering rules) and a proved resource
-   bound.
+   current fragment ([`lean/`](lean/)), which includes bounded Until for ordering rules (2026-10-23). **Next:** a
+   proved resource bound.
 2. **C2 — The deployed monitor is the verified code.** **Done so far:** the Lean executable and the Python monitor
-   agree on 71,320 generated cases and on all 16,248 LIBERO (episode, spec) pairs (`lean/BBMon.lean`,
+   agree on 124,105 generated cases and on all 16,248 LIBERO (episode, spec) pairs (`lean/BBMon.lean`,
    `monitor/tests/test_lean_conformance.py`). **Next:** run the Lean-compiled monitor itself in the control loop.
 3. **C3 — Run-time assurance around a VLA (main contribution).** π0.5 in LIBERO with a library of task-level rules
    that need temporal structure (ordering, response), atoms computed from simulator state, and an intervention when
@@ -92,7 +92,7 @@ GitHub's hosted runners:
 |---|---|
 | Lean proofs | `lake build --wfail` (any warning, e.g. `declaration uses 'sorry'`, fails); Lean's `leanchecker` replays every declaration through the kernel; `axiom-audit` and [`lean/Checks.lean`](lean/Checks.lean): every declaration uses only `propext`, `Classical.choice`, `Quot.sound`, and the main theorems keep their stated form; builds `bbmon` |
 | Independent kernel | [nanoda](https://github.com/ammkrn/nanoda_lib), a second Lean type checker written in Rust, re-checks the exported library ([`lean/scripts/nanoda.sh`](lean/scripts/nanoda.sh)) |
-| Lean = Python | the verified Lean monitor (`bbmon`) and the Python monitor agree on 71,320 generated cases |
+| Lean = Python | the verified Lean monitor (`bbmon`) and the Python monitor agree on 124,105 generated cases |
 | Python 3.10–3.14 | monitor tests; the package installs with no dependencies |
 | Lint and notebook | `ruff` (pinned rule set); the Colab notebook is regenerated from its kit and must be unchanged |
 | Paper | builds [`paper/main.tex`](paper/main.tex); the PDF is attached to the run |

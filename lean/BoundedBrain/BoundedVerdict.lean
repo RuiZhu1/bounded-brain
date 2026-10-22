@@ -9,6 +9,7 @@ import BoundedBrain.Monitor
 
       d tt = d ff = d (lit p b) = 1            d (next φ) = 1 + d φ        d (pending φ) = d φ
       d (G[0,k] φ) = d (F[0,k] φ) = k + d φ    d (φ ∧ ψ) = d (φ ∨ ψ) = max (d φ) (d ψ)
+      d (φ U[0,k] ψ) = k + max (d φ) (d ψ)
 
   `bounded_verdict`: after any `d φ` steps the residual is `tt` or `ff`.
   `verdict_final`: that verdict is then final and correct for every continuation of the trace.
@@ -16,7 +17,7 @@ import BoundedBrain.Monitor
   In course terms (docs/05-course-mapping.md): the time to a definite verdict is a bounded
   minimization, bounded by `d φ`; these are the specs "decidable within a finite horizon" (F32).
 
-  STATUS (2026-10-18): proved, no `sorry`; only Lean's standard axioms.
+  STATUS (2026-10-23): proved, no `sorry`, including bounded Until (P3-9); only Lean's standard axioms.
 -/
 
 namespace BoundedBrain
@@ -24,7 +25,7 @@ namespace BoundedBrain
 /-- No unbounded `always` anywhere in the formula. -/
 def Formula.alwaysFree {AP : Type} : Formula AP → Bool
   | .tt | .ff | .lit _ _ => true
-  | .conj φ ψ | .disj φ ψ => φ.alwaysFree && ψ.alwaysFree
+  | .conj φ ψ | .disj φ ψ | .untilWithin _ φ ψ => φ.alwaysFree && ψ.alwaysFree
   | .next φ | .pending φ => φ.alwaysFree
   | .always _ => false
   | .alwaysWithin _ φ | .eventuallyWithin _ φ => φ.alwaysFree
@@ -38,6 +39,7 @@ def Formula.verdictDepth {AP : Type} : Formula AP → Nat
   | .pending φ => φ.verdictDepth
   | .always φ => φ.verdictDepth
   | .alwaysWithin k φ | .eventuallyWithin k φ => k + φ.verdictDepth
+  | .untilWithin k φ ψ => k + max φ.verdictDepth ψ.verdictDepth
 
 /-- Every formula needs at least one step for a verdict. -/
 theorem Formula.one_le_verdictDepth {AP : Type} (φ : Formula AP) : 1 ≤ φ.verdictDepth := by
@@ -202,6 +204,30 @@ theorem bounded_verdict {AP : Type} (φ : Formula AP) (hφ : φ.alwaysFree = tru
         simp only [progress]
         rw [run_simpOr, ← run_cons]
         exact simpOr_isVerdict (ih hφ (σ :: rest) (by omega)) (ihk rest (by simp at h <;> omega))
+  | untilWithin k φ ψ ihφ ihψ =>
+    simp only [Formula.alwaysFree, Bool.and_eq_true] at hφ
+    have := φ.one_le_verdictDepth
+    have := ψ.one_le_verdictDepth
+    induction k generalizing tr with
+    | zero =>
+      simp only [Formula.verdictDepth] at h
+      cases tr with
+      | nil => simp at h <;> omega
+      | cons σ rest =>
+        rw [run_cons]
+        simp only [progress]
+        rw [← run_cons]
+        exact ihψ hφ.2 (σ :: rest) (by omega)
+    | succ k ihk =>
+      simp only [Formula.verdictDepth] at h ihk
+      cases tr with
+      | nil => simp at h <;> omega
+      | cons σ rest =>
+        rw [run_cons]
+        simp only [progress]
+        rw [run_simpOr, run_simpAnd, ← run_cons, ← run_cons]
+        exact simpOr_isVerdict (ihψ hφ.2 (σ :: rest) (by omega))
+          (simpAnd_isVerdict (ihφ hφ.1 (σ :: rest) (by omega)) (ihk rest (by simp at h <;> omega)))
 
 /-- [P3-8] After `d φ` steps the verdict is final: the trace satisfies `φ` however it continues
 exactly when the residual is `tt`. -/
