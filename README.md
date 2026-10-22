@@ -4,10 +4,13 @@
 
 [![CI](https://github.com/RuiZhu1/bounded-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/RuiZhu1/bounded-brain/actions/workflows/ci.yml)
 
-> **Status (2026-10-18).** The monitor's correctness theorems are machine-checked in Lean 4 (no `sorry`; see
+> **Status (2026-10-22).** The monitor's correctness theorems are machine-checked in Lean 4 (no `sorry`; see
 > [`lean/README.md`](lean/README.md)). A first evaluation on 4,062 π0.5 episodes in LIBERO is in
-> [`docs/08-libero-results.md`](docs/08-libero-results.md). Read [`TODO.md`](TODO.md) for the plan and
-> [`docs/02-facts-register.md`](docs/02-facts-register.md) for what has (and has not) been verified.
+> [`docs/08-libero-results.md`](docs/08-libero-results.md). The literature check (Phase 1) found that a verified
+> progression monitor is not new on its own, so the project was re-scoped to the use of such a monitor in a
+> run-time-assurance loop around a VLA ([`docs/01`](docs/01-research-question.md), decision D-028). Read
+> [`TODO.md`](TODO.md) for the plan and [`docs/02-facts-register.md`](docs/02-facts-register.md) for what has (and
+> has not) been verified.
 
 ## The idea in one paragraph
 
@@ -17,9 +20,12 @@ before the grasp is stable", "release within 50 steps", "never enter the forbidd
 Existing safety layers (control-barrier-function and constraint-manifold filters, e.g.
 ATACOM applied to π0) enforce *continuous geometric* constraints. We study the complementary
 *discrete, temporal* layer: a **bounded, total runtime monitor** for a finite-trace temporal
-logic fragment (LTLf), whose correctness is **machine-checked in Lean 4**, implemented in a
-dependency-free reference monitor, and integrated with an open-source VLA and a continuous
-safety filter in simulation.
+logic fragment (LTLf), whose correctness is **machine-checked in Lean 4**, used as the assured
+component of a **run-time-assurance loop** around an open-source VLA (π0.5 in LIBERO, in
+simulation): the monitor checks task-level rules on every step and triggers an intervention when
+a rule is violated. Verified monitors as such already exist (closest prior work in
+[`docs/01`](docs/01-research-question.md)); what we did not find is one running on the executions
+of a learned policy, and that is what this project studies.
 
 ## What we do and do not claim
 
@@ -27,26 +33,30 @@ safety filter in simulation.
 |---|---|
 | The monitor's verdict equals the reference LTLf semantics (Lean theorem). | That the robot is "provably safe". |
 | Early `VIOLATED` / `SATISFIED` verdicts are sound. | That perception labels are correct (assumption A1). |
-| Every step is a total function with cost bounded by the spec, not the trace length. | That the specs capture human intent (assumption A2). |
-| Integration with a VLA + continuous filter detects task-level violations that geometric filters cannot express, at acceptable latency. | That this beats any particular robot-learning system at manipulation. |
+| Every step is a total function with cost bounded by the spec, not the trace length (open: the current simplifier does not achieve this for nested `always`, F73). | That the specs capture human intent (assumption A2). |
+| In the loop of a VLA, the monitor runs at negligible latency, and acting on its alarms is worth the false alarms, measured counterfactually and compared with learned failure detectors. | That this beats any particular robot-learning system at manipulation. |
+| | That a verified progression monitor is new in itself (see [`docs/01`](docs/01-research-question.md)). |
 
 The honest guarantee is **conditional**: *if* perception labels are correct, *then* the monitor's
 verdict is correct with respect to the specification. See
 [`docs/04-architecture.md`](docs/04-architecture.md) for assumptions A1–A4.
 
-## Planned contributions (status 2026-10-18)
+## Planned contributions (re-scoped 2026-10-22, D-028)
 
-1. **C1 — Verified monitor.** A bounded LTLf fragment, a progression monitor, and Lean proofs
-   of end-of-trace correctness and sound early verdicts. **Done:** proved in [`lean/`](lean/), plus a
-   bounded-verdict theorem (always-free specs are decided within d(φ) steps).
-2. **C2 — Conformance.** Lean-compiled and Python implementations, differentially tested. **Done:** the Lean
-   executable and the Python monitor agree on 71,320 generated cases and on all 16,248 LIBERO (episode, spec)
-   pairs (`lean/BBMon.lean`, `monitor/tests/test_lean_conformance.py`).
-3. **C3 — Integration study.** π0 (open weights, via LeRobot) + a continuous safety filter +
-   the monitor in simulation; violation rate / success rate / latency against baselines. *First pass:* π0.5 on
-   LIBERO with privileged-state atoms, no filter or baselines yet (`docs/08`).
-4. **C4 (stretch).** Language-model-proposed specs that are machine-checked to lie in the
-   fragment before deployment ("code-as-safety", listed as future work by the ATACOM authors).
+1. **C1 — Verified monitor (a building block, not the main claim).** A bounded LTLf fragment, a progression
+   monitor, and Lean proofs of end-of-trace correctness, sound early verdicts and bounded verdicts. **Done** for the
+   current fragment ([`lean/`](lean/)). **Next:** bounded Until (needed for ordering rules) and a proved resource
+   bound.
+2. **C2 — The deployed monitor is the verified code.** **Done so far:** the Lean executable and the Python monitor
+   agree on 71,320 generated cases and on all 16,248 LIBERO (episode, spec) pairs (`lean/BBMon.lean`,
+   `monitor/tests/test_lean_conformance.py`). **Next:** run the Lean-compiled monitor itself in the control loop.
+3. **C3 — Run-time assurance around a VLA (main contribution).** π0.5 in LIBERO with a library of task-level rules
+   that need temporal structure (ordering, response), atoms computed from simulator state, and an intervention when
+   a rule is violated; evaluated against learned failure detectors and by the value of acting on alarms, using
+   counterfactual branches from saved simulator states. *First pass, offline:* 4,062 π0.5 episodes, four simple specs
+   (`docs/08`).
+4. **C4 (stretch).** Atom definitions checked in Lean against declarative definitions over the simulator state;
+   language-model-proposed specs that are machine-checked to lie in the fragment before deployment.
 
 ## Repository map
 

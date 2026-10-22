@@ -1,8 +1,10 @@
 # lean/ — machine-checked correctness of the monitor
 
 Lean 4 project `BoundedBrain`. Goal: prove that the progression monitor agrees with the
-reference LTLf semantics (and that early verdicts are sound). This is the project's core
-formal contribution (see `../TODO.md`, Phase 3).
+reference LTLf semantics (and that early verdicts are sound). This is the formal building block of
+the project (see `../TODO.md`, Phase 3); since the re-scope of 2026-10-22 (D-028) it is not the main
+contribution, because verified progression monitors already exist (`../docs/01-research-question.md`).
+Next on the critical path: bounded Until (P3-9) and a resource bound (P3-5).
 
 ## Status (2026-10-18)
 

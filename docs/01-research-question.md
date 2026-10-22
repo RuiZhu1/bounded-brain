@@ -1,15 +1,20 @@
 # 01 — Research question, hypotheses, non-goals
 
 Status: **draft**. Phase 1 (literature check) was done on 2026-10-22; the gap statement below replaces the hypothesis of
-2026-10-17. Gate G1 (proceed / re-scope / stop) is the owner's decision and still open (`TODO.md` Q12).
+2026-10-17. Gate G1 was decided by the owner on 2026-10-22: option (b), re-scope to the intersection (D-028). RQ2 and
+the success criteria below were rewritten for it.
 
 ## Research questions
 
 * **RQ1 (formal).** Can a *bounded, total* runtime monitor for a finite-trace temporal fragment be specified and
   proven correct in Lean 4 at a maintainable proof size? Correctness = end-of-trace agreement with the reference
   LTLf semantics + soundness of early verdicts + a resource bound that depends on the spec, not the trace.
-* **RQ2 (systems).** In a VLA + continuous-filter pipeline, does adding the monitor detect (and optionally prevent)
-  *task-level* violations that geometric filters cannot express, at acceptable latency and success-rate cost?
+* **RQ2 (systems; rewritten 2026-10-22 for option (b)).** Used as the assured monitor of a run-time-assurance loop
+  around a VLA (π0.5 in LIBERO), do the monitor's verdicts and the interventions they trigger reduce *task-level*
+  violations at an acceptable cost in success rate, latency and false alarms? How does it compare with learned failure
+  detectors on the same episodes, when the value of acting on an alarm is measured counterfactually?
+  *(Was: "In a VLA + continuous-filter pipeline, does adding the monitor detect (and optionally prevent) task-level
+  violations that geometric filters cannot express, at acceptable latency and success-rate cost?")*
 * **RQ3 (stretch).** Can model-proposed specifications be machine-checked (in-fragment, sanity conditions) before
   deployment?
 
@@ -79,7 +84,23 @@ sections, the others only in their abstracts (D-027). Claims of absence are abse
 | RESCUE (#37) | ✗ | ✗ | ✓ | evaluation | ✓ counterfactual | ? |
 | **bounded-brain (2026-10-22)** | ✓ bounded LTLf fragment | ✓ Lean 4 | ~ offline, π0.5 LIBERO traces | ~ online-capable, evaluated offline | ✗ | ✓ |
 
-## Gate G1 (pending: the owner decides)
+## Gate G1 (decided 2026-10-22 by the owner: option (b), D-028)
+
+What (b) commits to, in order (details and IDs in `TODO.md`):
+
+1. A fragment in which task-level rules are worth verifying: bounded Until for ordering rules, and residuals that stay
+   bounded (fix F73), both proved in Lean.
+2. A spec library from the LIBERO task goals with ordering, response and "after X, never Y" rules, first evaluated
+   offline on the existing 4,062 episodes.
+3. The Lean-compiled monitor itself in the control loop, with a measured per-step latency.
+4. A run-time-assurance design: which interventions (stop and hold, reset, scripted recovery, re-prompt), and exactly
+   what is assumed (A1–A4) and claimed.
+5. Online π0.5 runs with the monitor and interventions; comparison with learned failure detectors (F66); intervention
+   value from counterfactual branches of saved simulator states (as in F67; our traces store the MuJoCo state at
+   every step, D-016).
+6. Later: atom definitions checked in Lean (as in F56), perception noise (A1).
+
+The analysis that led to the decision follows, unchanged.
 
 Kill criterion K1 (`06-risks-and-kill-criteria.md`): stop or re-scope if a machine-checked monitor for the same or a
 stronger fragment exists **and** has been integrated with robot policies. The first condition is met (F53–F55); the
@@ -116,9 +137,18 @@ workshop. In either case, stop presenting C1 as the main contribution.
 * Formalizing continuous dynamics, CBF theory, or reachability in Lean (unless Gate G1 widens scope).
 * Beating any named robot-learning system at manipulation success.
 * Claiming "provable safety" of a physical robot.
+* Building a continuous safety filter (since 2026-10-22, D-028: CBF/ATACOM-style filters are context or an optional
+  baseline, not part of the contribution).
+* Claiming novelty for the verified monitor on its own (gap statement above).
 
-## Success criteria
+## Success criteria (rewritten 2026-10-22 for option (b))
 
-* **Minimum:** C1 complete (Lean theorems proved, `lake build` green) + Python conformance + a documented spec library.
-* **Target:** C1 + C2 + C3 in simulation with honest ablations.
-* **Stretch:** C4, real-robot demo.
+* **Minimum:** bounded Until and a resource bound proved in Lean (`lake build` green); a documented spec library with
+  rules that need temporal structure, evaluated offline on the existing π0.5 episodes; the Lean-compiled monitor
+  running in the simulation loop with measured latency.
+* **Target:** online π0.5 runs with interventions; comparison with at least one learned failure detector on the same
+  episodes; intervention value measured counterfactually; honest statistics (seeds, intervals, no cherry-picking).
+* **Stretch:** atom definitions checked in Lean; perception-noise ablation; LLM-proposed specs (C4); real robot.
+
+*(Before 2026-10-22: minimum = C1 + Python conformance + a spec library; target = C1–C3 in simulation with honest
+ablations; stretch = C4, real-robot demo.)*

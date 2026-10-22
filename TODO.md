@@ -2,7 +2,7 @@
 
 Conventions: `[ ]` open · `[~]` in progress · `[x]` done · **Gate** = a decision point (see
 `docs/06-risks-and-kill-criteria.md`). IDs (`P3-3`) are referenced from code (`sorry` tags) and docs.
-Update this file in the same change as the work. Last reviewed: 2026-10-22 (Phase 1 literature check; Gate G1 open).
+Update this file in the same change as the work. Last reviewed: 2026-10-22 (Phase 1 literature check; Gate G1: option (b), D-028).
 
 ## 0. Questions for the owner
 
@@ -26,9 +26,18 @@ Open follow-ups:
 - [ ] **Q9** Affiliation line for the README and the paper (or none).
 - [ ] **Q10** An institutional-policy question (risk R6); details in the owner's private notes. The owner's call.
 - [ ] **Q11** The owner wants a broader scope than the verified monitor (2026-10-17). Agree on an extended
-      roadmap before changing `README.md` / `docs/01`.
-- [ ] **Q12** Gate G1: proceed, re-scope or stop. Evidence, options (a)–(e) and the assistant's recommendation are in
+      roadmap before changing `README.md` / `docs/01`. *2026-10-22:* README, `docs/01` and the roadmap below were
+      rewritten for the Gate G1 choice (Q12). Close this if option (b) is the broader scope meant; otherwise say what
+      is missing.
+- [x] **Q12** Gate G1: proceed, re-scope or stop. Evidence, options (a)–(e) and the assistant's recommendation are in
       `docs/01-research-question.md` ("Gate G1"). The owner's call; record it in `docs/07`. Related to Q11.
+      → Option (b), 2026-10-22 (D-028): a machine-checked monitor in a run-time-assurance loop around π0.5.
+- [ ] **Q13** Compute for option (b). Online π0.5 runs (P5-5), new rollouts that log VLA features for the learned
+      detectors (P5-10) and counterfactual branches (P5-11) need GPU time. How many Colab units (or other GPUs) are
+      available, and from when? Everything up to P2-5 and P5-8 runs offline on the existing traces.
+- [ ] **Q14** Lean on the working machine. P3-9 and P3-5 change the Lean proofs, which need a local `lake build`
+      (or a push to CI). May an agent install elan and Lean v4.35.0 (about 3 GB, in `~/.elan`) on the machine that
+      holds this repository? That would also finish P0-2.
 
 ## Phase 0 — Orientation and environment (first session)
 
@@ -93,24 +102,59 @@ Done in one session on 2026-10-22 (D-027): relevant sections of the closest work
       (F71, `docs/03` G). Remaining: ease of running (none installed yet).
 
 **Gate G1 (decision):** proceed / re-scope / stop, per kill criterion K1. Record in the decision log.
-*2026-10-22:* evidence ready; K1 does not force a stop, but C1 cannot be the main contribution (`docs/01`). Decision
-pending (Q12).
+*2026-10-22:* evidence ready; K1 does not force a stop, but C1 cannot be the main contribution (`docs/01`). Decided
+by the owner: option (b) (Q12, D-028).
+
+## Critical path after Gate G1 (option b, D-028)
+
+Goal: a machine-checked monitor as the assured component of a run-time-assurance loop around π0.5 in LIBERO
+(`docs/01`, "Gate G1"). Order of work; steps 1–4 need no GPU.
+
+1. Bounded Until in the fragment, in Python and Lean together, with all theorems re-proved (P2-1, P3-9). Needs Q14.
+2. Residuals that stay bounded, and the bound proved (P2-4, P3-5; fixes F73).
+3. Spec library from the LIBERO task goals with ordering, response and "after X, never Y" rules, evaluated offline
+   on the existing 4,062 episodes (P2-5, P5-8).
+4. The Lean-compiled monitor in the loop, with a per-step latency benchmark (P4-4, P4-3); the run-time-assurance
+   design: interventions, assumptions, claims (P2-8).
+5. Online runs and evaluation: interventions (P5-5), learned-detector baselines (P5-10), intervention value from
+   counterfactual branches (P5-11). Needs GPU (Q13).
+6. Later: atom definitions checked in Lean (P2-7, P3-10); perception noise (P5-6); a benchmark with explicit
+   requirements (P5-12).
+
+Off the critical path since D-028: P2-6, P3-6, P5-4.
 
 ## Phase 2 — Specification language and monitor design
 
 - [ ] **P2-1** Freeze the fragment (grammar in `docs/04`). Decide on bounded `Until`, weak next.
+      *2026-10-22 (D-028):* add strong bounded Until `φ U[0,k] ψ` (ordering rules need it); weak next only if P2-5
+      needs it. Critical path, step 1.
 - [ ] **P2-2** Early verdicts: stay sound-only, or add a residual satisfiability check for completeness?
 - [ ] **P2-3** Define the perception→labels interface (atoms, rates, latency budget) and A1 wording.
 - [ ] **P2-4** Resource model: define `horizon φ`; state a bound on residual size as a Hypothesis test
       first (`size(run φ tr) ≤ size φ * (horizon φ + 1)` is the candidate; **a constant per-step factor is false**).
       *2026-10-22:* the candidate also fails when `always` is nested (linear growth, F73); restrict the fragment or
-      add normalisation first (`docs/04`, "Resource bound").
+      add normalisation first (`docs/04`, "Resource bound"). Options: (i) drop a conjunct or disjunct that already
+      occurs in the other argument (partial ACI normalisation; keeps "after X, never Y" expressible); (ii) forbid
+      `always` under `always`. Check (i) against the proofs first: `progress_simpAnd`, used by `bounded_verdict`, may
+      no longer hold syntactically. Critical path, step 2.
 - [ ] **P2-5** Spec library for pick-and-place: 6–10 specs, each with a natural-language description,
-      a formula, and positive/negative traces as unit tests.
+      a formula, and positive/negative traces as unit tests. *2026-10-22 (D-028):* derive the specs from the BDDL goals
+      of the LIBERO tasks and include rules that need temporal structure: ordering (e.g. open the drawer before
+      placing the bowl), bounded response, "after X, never Y". Evaluate them offline on the 4,062 existing episodes
+      (P5-8). Critical path, step 3.
 - [ ] **P2-6** Complexity of complete early verdicts (can a residual still be satisfied?) for this fragment, with
       bounds in unary vs binary. Literature first (F18 is MEMORY), then course weeks 8–13 (`docs/05`).
+      *Off the critical path since D-028.*
+- [ ] **P2-7** Atoms checked in Lean (option (b), as in F56): state the atom definitions over the simulator state
+      (grasp, contact, displacement, tilt, goal predicates) in Lean and decide what is proved about the code that
+      computes them. Floating point is the open problem (Rizaldi et al. used reals in the proofs and floats only for a
+      numerical example). Design note first.
+- [ ] **P2-8** Run-time-assurance design: interventions (stop and hold; reset; scripted recovery; re-prompt), when
+      the switch fires (violation, or a residual that can no longer be satisfied), and exactly what is assumed (A1–A4)
+      and claimed. Relate to the run-time-assurance pattern (F23: only the standard's product page was read).
+      Critical path, step 4.
 
-## Phase 3 — Lean formalization (core contribution)
+## Phase 3 — Lean formalization (a building block since D-028)
 
 - [x] **P3-1** Get `Formula.lean` / `Monitor.lean` compiling; polish naming. *Compiles since 2026-10-17.*
 - [x] **P3-2** Prove `sat_shift`, `simpAnd_sat`, `simpOr_sat`, `progress_sat` (key lemma), `acceptsEmpty_iff`.
@@ -129,6 +173,11 @@ pending (Q12).
       formulas). Links bounded minimization to monitorability and to the learnability result F32.
       *Proved 2026-10-18:* `lean/BoundedBrain/BoundedVerdict.lean` (`bounded_verdict`; `verdict_final` adds that
       the verdict is then correct for every continuation of the trace).
+- [ ] **P3-9** Bounded Until (after P2-1): extend `Formula`, `Sat`, `progress`, `acceptsEmpty` in Lean and Python
+      together (`φ U[0,0] ψ ↦ progress ψ`; `φ U[0,k+1] ψ ↦ simpOr (progress ψ) (simpAnd (progress φ) (φ U[0,k] ψ))`;
+      not accepted on the empty trace); re-prove every theorem, with verdict depth `k + max (d φ) (d ψ)`; extend
+      `Checks.lean`, `bbmon`, `spec.to_dict` and the exhaustive and conformance tests. Needs Q14. Critical path, step 1.
+- [ ] **P3-10** Atom definitions in Lean (after P2-7).
 
 Time box: if P3-3 is not done within the budget agreed in Q2, apply kill criterion K2.
 
@@ -141,6 +190,9 @@ Time box: if P3-3 is not done within the budget agreed in Q2, apply kill criteri
 - [~] **P4-3** Latency benchmark (µs/step). Targets to compare against: VLA chunk rate (~15 Hz) and filter
       rate (50–60 Hz) as reported in the ATACOM paper. *Indicative only:* the Lean binary did 3.67 M monitor
       steps in 1.9 s including JSON parsing (cloud sandbox, F50); a proper per-step benchmark is still to do.
+- [ ] **P4-4** The deployed monitor is the verified code (option (b)): a streaming mode of `bbmon` (one label per line
+      in, one verdict per line out) and a small Python client that the LeRobot evaluation loop calls every step; the
+      Python monitor stays as the reference and test oracle. Critical path, step 4.
 
 ## Phase 5 — Integration and evaluation (simulation)
 
@@ -155,9 +207,13 @@ Time box: if P3-3 is not done within the budget agreed in Q2, apply kill criteri
 - [x] **P5-1** Choose benchmark (from P1-7). Run π0 (open weights) through LeRobot; reproduce one published number.
       Done with π0.5 on LIBERO: 97.4% average vs 97.5% published (F43); π0's checkpoint does not load (F38).
 - [ ] **P5-2** Labeler: start from privileged simulator state; later add a perceived-label variant. Keep A1 explicit.
-- [ ] **P5-3** Detect-only mode: measure task-level violation rate of the raw VLA.
+- [ ] **P5-3** Detect-only mode: measure task-level violation rate of the raw VLA. *Offline version done (F45); the
+      online version runs with P5-5.*
 - [ ] **P5-4** Add a continuous filter baseline (ATACOM / CBF-style; check whether code is released).
+      *Optional since D-028.*
 - [ ] **P5-5** Enforcement mode: on `VIOLATED`/imminent violation, hold or retreat; measure success-vs-safety trade-off.
+      *Since D-028:* the interventions of P2-8, in online π0.5 runs with the monitor of P4-4; report success,
+      violations and false alarms. Needs GPU (Q13). Critical path, step 5.
 - [ ] **P5-6** Perception-noise ablation: show honestly where the guarantee degrades.
 - [ ] **P5-7** Statistics: seeds, confidence intervals, no cherry-picked episodes.
 - [~] **P5-8** Offline analysis of the Colab traces: LIBERO spec library (P2-5 with predicates recomputed from the
@@ -168,8 +224,18 @@ Time box: if P3-3 is not done within the budget agreed in Q2, apply kill criteri
       papers in full; check whether π0.5 was evaluated anywhere under language or object perturbations.
       *2026-10-22:* also AFI (F68), which detects and intervenes on a related "memory trap" with π0 and π0.5, and the
       learned detectors that already use π0.5 on LIBERO (F66).
+- [ ] **P5-10** Learned-detector baselines (option (b)): SAFE and Hide-and-Seek (F66). Check their code, licenses and
+      inputs: SAFE reads VLA-internal features, which our traces do not store (what Hide-and-Seek needs is not checked
+      yet), so new rollouts will probably have to log them (Q13). Compare with the monitor on the same episodes.
+      Critical path, step 5.
+- [ ] **P5-11** Intervention value (option (b)), as in RESCUE (F67): at each alarm, branch from the saved simulator
+      state (D-016) and compare continuing with intervening; report the false-alarm rate the intervention can afford.
+      Needs GPU for the policy rollouts (Q13). Critical path, step 5.
+- [ ] **P5-12** A benchmark with explicit requirements: LIBERO-Constrained if its code is released (F62); the per-step
+      safety predicates of LIBERO-Safety (F71); otherwise the BDDL-derived specs of P2-5.
 
-**Gate G5:** if the monitor shows no measurable benefit over the baselines, apply K3 before writing.
+**Gate G5:** if the monitor shows no measurable benefit over the baselines, apply K3 before writing (baselines and
+criteria updated in K3 by D-028).
 
 ## Phase 6 — Optional real robot (deferred: no robot arm, see Q1)
 

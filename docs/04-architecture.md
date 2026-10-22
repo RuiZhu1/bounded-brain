@@ -2,6 +2,10 @@
 
 Status: **design draft** — freeze in Phase 2 (P2-1).
 
+*Re-scoped 2026-10-22 (D-028):* the monitor is the assured component of a run-time-assurance loop around the VLA
+(π0.5 in LIBERO). In the diagram below, the continuous filter is optional context, and "hold / retreat" becomes the
+intervention, to be designed in P2-8. The fragment gains bounded Until (P2-1) and must keep residuals bounded (P2-4).
+
 ## System view
 
 ```
