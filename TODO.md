@@ -2,7 +2,7 @@
 
 Conventions: `[ ]` open · `[~]` in progress · `[x]` done · **Gate** = a decision point (see
 `docs/06-risks-and-kill-criteria.md`). IDs (`P3-3`) are referenced from code (`sorry` tags) and docs.
-Update this file in the same change as the work. Last reviewed: 2026-10-23 (bounded Until, P3-9; Lean installed on the owner's machine).
+Update this file in the same change as the work. Last reviewed: 2026-10-23 (bounded Until, P3-9; normal form and resource bound, P2-4, P3-5).
 
 ## 0. Questions for the owner
 
@@ -114,7 +114,8 @@ Goal: a machine-checked monitor as the assured component of a run-time-assurance
 
 1. Bounded Until in the fragment, in Python and Lean together, with all theorems re-proved (P2-1, P3-9).
    **Done 2026-10-23** (F74, D-029).
-2. Residuals that stay bounded, and the bound proved (P2-4, P3-5; fixes F73).
+2. Residuals that stay bounded, and the bound proved (P2-4, P3-5; fixes F73). **Done 2026-10-23** (F76, F77,
+   D-030, D-031).
 3. Spec library from the LIBERO task goals with ordering, response and "after X, never Y" rules, evaluated offline
    on the existing 4,062 episodes (P2-5, P5-8).
 4. The Lean-compiled monitor in the loop, with a per-step latency benchmark (P4-4, P4-3); the run-time-assurance
@@ -133,13 +134,14 @@ Off the critical path since D-028: P2-6, P3-6, P5-4.
       needs it. Critical path, step 1. *2026-10-23:* bounded Until added (P3-9, D-029); freeze after P2-5.
 - [ ] **P2-2** Early verdicts: stay sound-only, or add a residual satisfiability check for completeness?
 - [ ] **P2-3** Define the perception→labels interface (atoms, rates, latency budget) and A1 wording.
-- [ ] **P2-4** Resource model: define `horizon φ`; state a bound on residual size as a Hypothesis test
+- [x] **P2-4** Resource model: define `horizon φ`; state a bound on residual size as a Hypothesis test
       first (`size(run φ tr) ≤ size φ * (horizon φ + 1)` is the candidate; **a constant per-step factor is false**).
       *2026-10-22:* the candidate also fails when `always` is nested (linear growth, F73); restrict the fragment or
       add normalisation first (`docs/04`, "Resource bound"). Options: (i) drop a conjunct or disjunct that already
       occurs in the other argument (partial ACI normalisation; keeps "after X, never Y" expressible); (ii) forbid
       `always` under `always`. Check (i) against the proofs first: `progress_simpAnd`, used by `bounded_verdict`, may
-      no longer hold syntactically. Critical path, step 2.
+      no longer hold syntactically. Critical path, step 2. *2026-10-23:* option (i), as a full normal form (flattening,
+      removal of repeated conjuncts and disjuncts keeping the last occurrence, D-030); commutation still holds (F77).
 - [ ] **P2-5** Spec library for pick-and-place: 6–10 specs, each with a natural-language description,
       a formula, and positive/negative traces as unit tests. *2026-10-22 (D-028):* derive the specs from the BDDL goals
       of the LIBERO tasks and include rules that need temporal structure: ordering (e.g. open the drawer before
@@ -164,7 +166,9 @@ Off the critical path since D-028: P2-6, P3-6, P5-4.
       *Proved 2026-10-18.*
 - [x] **P3-3** Prove `accepts_iff_sat` (main theorem). *Proved 2026-10-18.*
 - [x] **P3-4** Prove `violated_sound` and `satisfied_sound`. *Proved 2026-10-18.*
-- [ ] **P3-5** Resource bound theorem (after P2-4 fixes the statement).
+- [x] **P3-5** Resource bound theorem (after P2-4 fixes the statement). *Proved 2026-10-23:* `size_run_le`,
+      `(run φ tr).size ≤ resBound φ` (`lean/BoundedBrain/Resource.lean`, D-031). The bound is very large for `always`
+      nested over a disjunction (F78); a tighter, computable bound is open.
 - [ ] **P3-6** *Bridge to the course:* `run φ` is primitive recursive under a coding of formulas and finite
       labels. Mathlib has `Primcodable`, `Primrec`, `Primrec.list_foldl` (F34); `progress` recurses on the formula
       tree, which needs course-of-values recursion on codes (`docs/05`). Never blocks the main line.

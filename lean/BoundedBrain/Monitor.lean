@@ -3,35 +3,68 @@ import BoundedBrain.Formula
 /-
   BoundedBrain.Monitor — progression-based monitor and its correctness theorems.
 
-  Mirrors `monitor/src/bounded_brain/monitor.py` (same simplification rules: only
-  TT/FF absorption, NO deduplication).
+  Mirrors `monitor/src/bounded_brain/monitor.py` (same simplification rules: TT/FF absorption,
+  flattening, and removal of repeated conjuncts and disjuncts keeping the last occurrence; D-030).
 
   STATUS (2026-10-23): compiles with Lean v4.35.0; the correctness theorems (TODO P3-2,
   P3-3, P3-4) are proved, with no `sorry`, including bounded Until (P3-9). The bounded-verdict
-  theorem (P3-8) is in BoundedVerdict.lean. Open: the resource bound (P3-5). Do not merge a
+  theorem (P3-8) is in BoundedVerdict.lean, the resource bound (P3-5) in Resource.lean. Do not merge a
   `sorry` that is not listed in TODO.md.
 -/
 
 namespace BoundedBrain
 
-/-- Conjunction with TT/FF absorption (order of rules matches Python `simp_and`). -/
-def simpAnd {AP : Type} : Formula AP → Formula AP → Formula AP
-  | .ff, _ => .ff
-  | _, .ff => .ff
-  | .tt, b => b
-  | a, .tt => a
-  | a, b => .conj a b
+/-- The conjuncts of a formula: its tree of `conj` nodes flattened, left to right. `tt` contributes nothing;
+any other formula that is not a `conj` is its own single conjunct. -/
+def Formula.conjuncts {AP : Type} : Formula AP → List (Formula AP)
+  | .tt => []
+  | .conj a b => a.conjuncts ++ b.conjuncts
+  | x => [x]
 
-/-- Disjunction with TT/FF absorption (order of rules matches Python `simp_or`). -/
-def simpOr {AP : Type} : Formula AP → Formula AP → Formula AP
-  | .tt, _ => .tt
-  | _, .tt => .tt
-  | .ff, b => b
-  | a, .ff => a
-  | a, b => .disj a b
+/-- The disjuncts of a formula, dually: `ff` contributes nothing. -/
+def Formula.disjuncts {AP : Type} : Formula AP → List (Formula AP)
+  | .ff => []
+  | .disj a b => a.disjuncts ++ b.disjuncts
+  | x => [x]
+
+/-- Drop every element that occurs again later in the list, so that the last occurrence is kept. -/
+def dedupLast {α : Type} [DecidableEq α] : List α → List α
+  | [] => []
+  | x :: xs => if x ∈ xs then dedupLast xs else x :: dedupLast xs
+
+/-- Right-nested conjunction of a list (`tt` for the empty list). -/
+def mkConj {AP : Type} : List (Formula AP) → Formula AP
+  | [] => .tt
+  | [x] => x
+  | x :: y :: ys => .conj x (mkConj (y :: ys))
+
+/-- Right-nested disjunction of a list (`ff` for the empty list). -/
+def mkDisj {AP : Type} : List (Formula AP) → Formula AP
+  | [] => .ff
+  | [x] => x
+  | x :: y :: ys => .disj x (mkDisj (y :: ys))
+
+/-- Normal conjunction of a list of conjuncts: `ff` if one of them is `ff`, otherwise the right-nested conjunction
+of the list with repetitions removed. -/
+def normAnd {AP : Type} [DecidableEq AP] (ms : List (Formula AP)) : Formula AP :=
+  if .ff ∈ ms then .ff else mkConj (dedupLast ms)
+
+/-- Normal disjunction of a list of disjuncts, dually. -/
+def normOr {AP : Type} [DecidableEq AP] (ms : List (Formula AP)) : Formula AP :=
+  if .tt ∈ ms then .tt else mkDisj (dedupLast ms)
+
+/-- Conjunction with TT/FF absorption, flattening, and removal of repeated conjuncts (mirrors Python
+`simp_and`). Removing repetitions is what keeps residuals small when `always` is nested (D-030, F73). -/
+def simpAnd {AP : Type} [DecidableEq AP] (a b : Formula AP) : Formula AP :=
+  normAnd (a.conjuncts ++ b.conjuncts)
+
+/-- Disjunction with TT/FF absorption, flattening, and removal of repeated disjuncts (mirrors Python
+`simp_or`). -/
+def simpOr {AP : Type} [DecidableEq AP] (a b : Formula AP) : Formula AP :=
+  normOr (a.disjuncts ++ b.disjuncts)
 
 /-- Residual obligation on the rest of the trace after consuming one step `σ`. -/
-def progress {AP : Type} (σ : Label AP) : Formula AP → Formula AP
+def progress {AP : Type} [DecidableEq AP] (σ : Label AP) : Formula AP → Formula AP
   | .tt => .tt
   | .ff => .ff
   | .lit p b => if σ p == b then .tt else .ff
@@ -62,11 +95,11 @@ def acceptsEmpty {AP : Type} : Formula AP → Bool
   | .untilWithin _ _ _ => false
 
 /-- Fold `progress` over a whole trace; returns the final residual. -/
-def run {AP : Type} (φ : Formula AP) (tr : Trace AP) : Formula AP :=
+def run {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr : Trace AP) : Formula AP :=
   tr.foldl (fun f σ => progress σ f) φ
 
 /-- The monitor's end-of-trace answer. -/
-def accepts {AP : Type} (φ : Formula AP) (tr : Trace AP) : Bool :=
+def accepts {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr : Trace AP) : Bool :=
   acceptsEmpty (run φ tr)
 
 /-! ## Correctness theorems
@@ -122,16 +155,82 @@ theorem sat_shift {AP : Type} (σ : Label AP) (tr : Trace AP) (φ : Formula AP) 
       obtain ⟨m', rfl⟩ : ∃ m', m = m' + 1 := ⟨m - 1, by omega⟩
       exact (ihφ m').mpr (hφ m' (by omega) (by omega))
 
-/-- [P3-2] Simplification preserves semantics. Proof: case split on the two arguments (144 cases, each closed
-by unfolding `simpAnd` and `Sat`). -/
-theorem simpAnd_sat {AP : Type} (tr : Trace AP) (a b : Formula AP) (i : Nat) :
+/-! ### The simplifiers preserve the semantics -/
+
+theorem mem_dedupLast {α : Type} [DecidableEq α] (x : α) (l : List α) : x ∈ dedupLast l ↔ x ∈ l := by
+  induction l with
+  | nil => simp [dedupLast]
+  | cons y ys ih =>
+    by_cases h : y ∈ ys
+    · simp only [dedupLast, h, ↓reduceIte, ih, List.mem_cons]
+      constructor
+      · exact Or.inr
+      · rintro (rfl | hx)
+        · exact h
+        · exact hx
+    · simp only [dedupLast, h, ↓reduceIte, List.mem_cons, ih]
+
+/-- A formula holds iff all its conjuncts hold. -/
+theorem sat_conjuncts {AP : Type} (tr : Trace AP) (i : Nat) (φ : Formula AP) :
+    Sat tr φ i ↔ ∀ y ∈ φ.conjuncts, Sat tr y i := by
+  induction φ with
+  | tt => simp [Formula.conjuncts, Sat]
+  | conj a b iha ihb => simp only [Formula.conjuncts, Sat, iha, ihb, List.forall_mem_append]
+  | _ => simp [Formula.conjuncts]
+
+/-- A formula holds iff one of its disjuncts holds. -/
+theorem sat_disjuncts {AP : Type} (tr : Trace AP) (i : Nat) (φ : Formula AP) :
+    Sat tr φ i ↔ ∃ y ∈ φ.disjuncts, Sat tr y i := by
+  induction φ with
+  | ff => simp [Formula.disjuncts, Sat]
+  | disj a b iha ihb =>
+    simp only [Formula.disjuncts, Sat, iha, ihb, List.mem_append, or_and_right, exists_or]
+  | _ => simp [Formula.disjuncts]
+
+theorem sat_mkConj {AP : Type} (tr : Trace AP) (i : Nat) :
+    ∀ l : List (Formula AP), Sat tr (mkConj l) i ↔ ∀ y ∈ l, Sat tr y i
+  | [] => by simp [mkConj, Sat]
+  | [x] => by simp [mkConj]
+  | x :: y :: ys => by
+    rw [mkConj, List.forall_mem_cons, ← sat_mkConj tr i (y :: ys)]
+    exact Iff.rfl
+
+theorem sat_mkDisj {AP : Type} (tr : Trace AP) (i : Nat) :
+    ∀ l : List (Formula AP), Sat tr (mkDisj l) i ↔ ∃ y ∈ l, Sat tr y i
+  | [] => by simp [mkDisj, Sat]
+  | [x] => by simp [mkDisj]
+  | x :: y :: ys => by
+    rw [mkDisj]
+    simp only [Sat, sat_mkDisj tr i (y :: ys), List.mem_cons, or_and_right, exists_or, exists_eq_left]
+
+theorem sat_normAnd {AP : Type} [DecidableEq AP] (tr : Trace AP) (i : Nat) (ms : List (Formula AP)) :
+    Sat tr (normAnd ms) i ↔ ∀ y ∈ ms, Sat tr y i := by
+  unfold normAnd
+  split
+  · rename_i h
+    exact ⟨fun hf => (hf : False).elim, fun hall => hall .ff h⟩
+  · rw [sat_mkConj]
+    simp only [mem_dedupLast]
+
+theorem sat_normOr {AP : Type} [DecidableEq AP] (tr : Trace AP) (i : Nat) (ms : List (Formula AP)) :
+    Sat tr (normOr ms) i ↔ ∃ y ∈ ms, Sat tr y i := by
+  unfold normOr
+  split
+  · rename_i h
+    exact ⟨fun _ => ⟨.tt, h, trivial⟩, fun _ => trivial⟩
+  · rw [sat_mkDisj]
+    simp only [mem_dedupLast]
+
+/-- [P3-2] Simplification preserves semantics: a normalised conjunction holds iff both arguments hold. -/
+theorem simpAnd_sat {AP : Type} [DecidableEq AP] (tr : Trace AP) (a b : Formula AP) (i : Nat) :
     Sat tr (simpAnd a b) i ↔ Sat tr a i ∧ Sat tr b i := by
-  cases a <;> cases b <;> simp [simpAnd, Sat]
+  rw [simpAnd, sat_normAnd, sat_conjuncts tr i a, sat_conjuncts tr i b, List.forall_mem_append]
 
 /-- [P3-2] Same for disjunction. -/
-theorem simpOr_sat {AP : Type} (tr : Trace AP) (a b : Formula AP) (i : Nat) :
+theorem simpOr_sat {AP : Type} [DecidableEq AP] (tr : Trace AP) (a b : Formula AP) (i : Nat) :
     Sat tr (simpOr a b) i ↔ Sat tr a i ∨ Sat tr b i := by
-  cases a <;> cases b <;> simp [simpOr, Sat]
+  rw [simpOr, sat_normOr, sat_disjuncts tr i a, sat_disjuncts tr i b]
+  simp only [List.mem_append, or_and_right, exists_or]
 
 /-- [P3-2] KEY LEMMA (one-step progression).
 Consuming a step `σ` and then evaluating the residual at the start of the rest equals
@@ -145,7 +244,7 @@ Proof: induction on `φ`.
   * `untilWithin (k+1) φ ψ`: the witness is 0 (ψ holds now, IH on ψ) or `j + 1` (φ holds now, IH on φ,
     and the rest is the until with bound k, via `sat_shift` for both arguments).
   * bound 0 cases reduce to IH on ψ. -/
-theorem progress_sat {AP : Type} (σ : Label AP) (tr : Trace AP) (φ : Formula AP) :
+theorem progress_sat {AP : Type} [DecidableEq AP] (σ : Label AP) (tr : Trace AP) (φ : Formula AP) :
     Sat (σ :: tr) φ 0 ↔ Sat tr (progress σ φ) 0 := by
   induction φ with
   | tt => simp [Sat, progress]
@@ -261,12 +360,12 @@ theorem acceptsEmpty_iff {AP : Type} (φ : Formula AP) :
   | _ => simp [acceptsEmpty, Sat]
 
 /-- One step of `run`: `run φ (σ :: tr) = run (progress σ φ) tr` (by `List.foldl_cons`). -/
-theorem run_cons {AP : Type} (φ : Formula AP) (σ : Label AP) (tr : Trace AP) :
+theorem run_cons {AP : Type} [DecidableEq AP] (φ : Formula AP) (σ : Label AP) (tr : Trace AP) :
     run φ (σ :: tr) = run (progress σ φ) tr := rfl
 
 /-- [P3-3] MAIN THEOREM: the monitor accepts exactly the traces that satisfy the spec.
 Proof: induction on `tr` generalizing `φ`, using `progress_sat` and `acceptsEmpty_iff`. -/
-theorem accepts_iff_sat {AP : Type} (φ : Formula AP) (tr : Trace AP) :
+theorem accepts_iff_sat {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr : Trace AP) :
     accepts φ tr = true ↔ Sat tr φ 0 := by
   induction tr generalizing φ with
   | nil => exact acceptsEmpty_iff φ
@@ -276,41 +375,40 @@ theorem accepts_iff_sat {AP : Type} (φ : Formula AP) (tr : Trace AP) :
     exact ih (progress σ φ)
 
 /-- Running over a concatenation is running over the first part, then the second. -/
-theorem run_append {AP : Type} (φ : Formula AP) (tr ext : Trace AP) :
+theorem run_append {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr ext : Trace AP) :
     run φ (tr ++ ext) = run (run φ tr) ext := by
   simp [run, List.foldl_append]
 
 /-- `ff` is a fixed point of the monitor. -/
-theorem run_ff {AP : Type} (ext : Trace AP) : run (.ff : Formula AP) ext = .ff := by
+theorem run_ff {AP : Type} [DecidableEq AP] (ext : Trace AP) : run (.ff : Formula AP) ext = .ff := by
   induction ext with
   | nil => rfl
   | cons σ ext ih => rw [run_cons]; exact ih
 
 /-- `tt` is a fixed point of the monitor. -/
-theorem run_tt {AP : Type} (ext : Trace AP) : run (.tt : Formula AP) ext = .tt := by
+theorem run_tt {AP : Type} [DecidableEq AP] (ext : Trace AP) : run (.tt : Formula AP) ext = .tt := by
   induction ext with
   | nil => rfl
   | cons σ ext ih => rw [run_cons]; exact ih
 
 /-- [P3-4] Early VIOLATED verdict is sound: if the residual is `ff`, no extension satisfies φ.
 Proof: `run φ (tr ++ ext) = run (run φ tr) ext = run .ff ext = .ff`, then `accepts_iff_sat`. -/
-theorem violated_sound {AP : Type} (φ : Formula AP) (tr ext : Trace AP)
+theorem violated_sound {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr ext : Trace AP)
     (h : run φ tr = .ff) : ¬ Sat (tr ++ ext) φ 0 := by
   rw [← accepts_iff_sat, accepts, run_append, h, run_ff]
   simp [acceptsEmpty]
 
 /-- [P3-4] Early SATISFIED verdict is sound: if the residual is `tt`, every extension satisfies φ. -/
-theorem satisfied_sound {AP : Type} (φ : Formula AP) (tr ext : Trace AP)
+theorem satisfied_sound {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr ext : Trace AP)
     (h : run φ tr = .tt) : Sat (tr ++ ext) φ 0 := by
   rw [← accepts_iff_sat, accepts, run_append, h, run_tt]
   rfl
 
 /-! ## Resource bound (TODO P3-5)
 
-We want a bound on `(run φ tr).size` that depends only on `φ`, not on `tr`. A constant
-factor per step is FALSE (`always` adds a copy per step); the right statement is of the
-shape `(run φ tr).size ≤ φ.size * (φ.horizon + 1)` where `horizon` sums the `next`-depth and
-the bounds. First state it as a Hypothesis test in Python (monitor/tests), then prove it here.
-Define `Formula.horizon` first. -/
+We want a bound on `(run φ tr).size` that depends only on `φ`, not on `tr`. Without removing repeated
+conjuncts the size grows linearly when `always` is nested (F73); `simpAnd` / `simpOr` now remove them (D-030).
+Normal.lean shows that every residual is in normal form and that progression commutes with the simplifiers;
+Resource.lean proves the bound (`size_run_le`). -/
 
 end BoundedBrain

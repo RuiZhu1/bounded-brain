@@ -4,7 +4,8 @@ Lean 4 project `BoundedBrain`. Goal: prove that the progression monitor agrees w
 reference LTLf semantics (and that early verdicts are sound). This is the formal building block of
 the project (see `../TODO.md`, Phase 3); since the re-scope of 2026-10-22 (D-028) it is not the main
 contribution, because verified progression monitors already exist (`../docs/01-research-question.md`).
-Next on the critical path: a resource bound (P3-5).
+The resource bound (P3-5) was proved on 2026-10-23; the next Lean work on the critical path is the atom definitions
+(P3-10).
 
 ## Status (2026-10-23)
 
@@ -14,10 +15,14 @@ Next on the critical path: a resource bound (P3-5).
   below covers it.
 * `Monitor.lean`: `sat_shift`, `simpAnd_sat`, `simpOr_sat`, `progress_sat`, `acceptsEmpty_iff` (P3-2),
   `accepts_iff_sat` (P3-3, main theorem), `violated_sound`, `satisfied_sound` (P3-4).
+* `Normal.lean`: every residual is in normal form (`norm_progress`); progression commutes with the simplifiers
+  (`progress_simpAnd`, `progress_simpOr`) (D-030).
 * `BoundedVerdict.lean`: `bounded_verdict` and `verdict_final` (P3-8).
+* `Resource.lean`: every residual lies in an explicit finite list `reach φ` (`run_mem_reach`), so
+  `(run φ tr).size ≤ resBound φ` for every trace (`size_run_le`, P3-5, D-031).
 * `BBMon.lean` (P3-7): executable `bbmon` that runs these verified functions on JSON input; it agrees with the
   Python monitor on every case tried (`monitor/tests/test_lean_conformance.py`, F50).
-* Open: resource bound (P3-5), primitive-recursion bridge (P3-6).
+* Open: primitive-recursion bridge (P3-6); a tighter, computable resource bound.
 
 ## Files
 
@@ -25,8 +30,10 @@ Next on the critical path: a resource bound (P3-5).
 |---|---|---|
 | `BoundedBrain/Formula.lean` | `Label`, `Trace`, `Formula`, `Formula.size`, reference semantics `Sat` | `spec.py` (`holds`) |
 | `BoundedBrain/Monitor.lean` | `simpAnd/simpOr`, `progress`, `acceptsEmpty`, `run`, `accepts`; correctness theorems (proved) | `monitor.py` |
+| `BoundedBrain/Normal.lean` | normal form of residuals, `progress_simpAnd`, `progress_simpOr` | `tests/test_monitor.py` (commutation test) |
 | `BoundedBrain/BoundedVerdict.lean` | `Formula.alwaysFree`, `Formula.verdictDepth`, `bounded_verdict`, `verdict_final` | `tests/test_bounded_verdict.py` |
-| `BoundedBrain.lean` | library root (imports the three files) | — |
+| `BoundedBrain/Resource.lean` | `reach`, `resBound`, `run_mem_reach`, `size_run_le` | `tests/test_monitor.py` (residual-size tests) |
+| `BoundedBrain.lean` | library root (imports the five files) | — |
 | `BBMon.lean` | executable `bbmon`: JSON specs and traces in, verdicts out (parser and printer not verified) | `to_dict` / `from_dict` |
 | `Checks.lean` | CI checks: the main theorems keep their stated form; every declaration uses only the standard axioms | — |
 | `scripts/nanoda.sh` | re-checks the library with nanoda, an independent type checker written in Rust | — |
@@ -72,15 +79,19 @@ Agent sandboxes cannot reach `release.lean-lang.org`; see `../CLAUDE.md` (enviro
 Done (2026-10-18): `sat_shift`, `simpAnd_sat`, `simpOr_sat`, `progress_sat` (the key lemma), `acceptsEmpty_iff`,
 `accepts_iff_sat` (main theorem), `violated_sound`, `satisfied_sound`, `bounded_verdict`, `verdict_final`.
 
+Done (2026-10-23): bounded Until in every theorem (P3-9); normal form and commutation (`Normal.lean`); resource
+bound `size_run_le` (P3-5).
+
 Next:
-1. Resource bound (needs a `Formula.horizon` definition; see the end of `Monitor.lean`) — P3-5
+1. Atom definitions over the simulator state (P2-7, P3-10)
 2. Optional bridge theorem (P3-6): the monitor step is primitive recursive under a Gödel coding
    (would need Mathlib's `Nat.Primrec`; check the API first)
 
 ## Rules
 
 * No `axiom`. No `sorry` unless it is tracked by a TODO ID.
-* Keep simplification rules identical to the Python side (no deduplication).
+* Keep simplification rules identical to the Python side (flattening and removal of repeated conjuncts and
+  disjuncts, D-030).
 * Do not add Mathlib unless a task needs it; record the decision.
 * The Lean side must stay in the discrete world. Continuous dynamics are out of scope unless
   the Gate G1 decision explicitly changes that.

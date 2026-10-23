@@ -33,6 +33,7 @@ inductive Formula (AP : Type) where
   | alwaysWithin : Nat → Formula AP → Formula AP        -- G[0,k] φ
   | eventuallyWithin : Nat → Formula AP → Formula AP    -- F[0,k] φ
   | untilWithin : Nat → Formula AP → Formula AP → Formula AP  -- φ U[0,k] ψ (strong)
+  deriving DecidableEq  -- the simplifiers remove repeated conjuncts and disjuncts (D-030)
 
 /-- Number of nodes; memory proxy for the monitor state. -/
 def Formula.size {AP : Type} : Formula AP → Nat

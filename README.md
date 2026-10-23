@@ -33,7 +33,7 @@ of a learned policy, and that is what this project studies.
 |---|---|
 | The monitor's verdict equals the reference LTLf semantics (Lean theorem). | That the robot is "provably safe". |
 | Early `VIOLATED` / `SATISFIED` verdicts are sound. | That perception labels are correct (assumption A1). |
-| Every step is a total function with cost bounded by the spec, not the trace length (open: the current simplifier does not achieve this for nested `always`, F73). | That the specs capture human intent (assumption A2). |
+| Every step is a total function, and the monitor state is bounded by a number that depends on the spec, not on the trace length (Lean theorem `size_run_le`; the bound is very large for nested `always`). | That the specs capture human intent (assumption A2). |
 | In the loop of a VLA, the monitor runs at negligible latency, and acting on its alarms is worth the false alarms, measured counterfactually and compared with learned failure detectors. | That this beats any particular robot-learning system at manipulation. |
 | | That a verified progression monitor is new in itself (see [`docs/01`](docs/01-research-question.md)). |
 
@@ -45,8 +45,8 @@ verdict is correct with respect to the specification. See
 
 1. **C1 — Verified monitor (a building block, not the main claim).** A bounded LTLf fragment, a progression
    monitor, and Lean proofs of end-of-trace correctness, sound early verdicts and bounded verdicts. **Done** for the
-   current fragment ([`lean/`](lean/)), which includes bounded Until for ordering rules (2026-10-23). **Next:** a
-   proved resource bound.
+   current fragment ([`lean/`](lean/)), which includes bounded Until for ordering rules, and a proved bound on the size of the monitor state
+   (2026-10-23).
 2. **C2 — The deployed monitor is the verified code.** **Done so far:** the Lean executable and the Python monitor
    agree on 124,105 generated cases and on all 16,248 LIBERO (episode, spec) pairs (`lean/BBMon.lean`,
    `monitor/tests/test_lean_conformance.py`). **Next:** run the Lean-compiled monitor itself in the control loop.

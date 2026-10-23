@@ -48,8 +48,9 @@ available (`TODO.md` §0). Personal and institutional context is kept out of the
 * `lake build` must pass. `sorry` only when tracked by a TODO ID in the docstring. No `axiom`.
 * Keep the core free of Mathlib unless a task needs it; record the decision in `docs/07`.
 * Toolchain pinned in `lean/lean-toolchain` (Lean v4.35.0, D-012). `lake build` is green with no
-  warnings (all stated theorems proved, 2026-10-18; bounded Until added and proved, 2026-10-23).
-* Python and Lean simplification rules must stay identical (TT/FF absorption only, no deduplication).
+  warnings (all stated theorems proved, 2026-10-18; bounded Until added and proved, 2026-10-23; resource bound proved, 2026-10-23).
+* Python and Lean simplification rules must stay identical (TT/FF absorption, flattening, and removal of repeated
+  conjuncts and disjuncts keeping the last occurrence; D-030).
   `monitor/tests/test_lean_conformance.py` checks this against the Lean binary (`cd lean && lake build bbmon`).
 
 ## Python rules

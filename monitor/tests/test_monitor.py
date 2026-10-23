@@ -39,6 +39,7 @@ from bounded_brain import (
     run,
     size,
 )
+from bounded_brain.monitor import simp_and, simp_or
 
 A, B = "a", "b"
 LABELS = [frozenset(s) for s in ([], [A], [B], [A, B])]
@@ -190,6 +191,60 @@ def test_residual_size_is_bounded() -> None:
             m.reset()  # restart after a violation so we keep exploring states
         worst = max(worst, size(m.residual))
     assert worst <= 2 * size(spec) + 4, worst
+
+
+def _peak(spec: Formula, labels: List[frozenset]) -> int:
+    residual, worst = spec, size(spec)
+    for label in labels:
+        residual = progress(label, residual)
+        worst = max(worst, size(residual))
+    return worst
+
+
+def test_nested_always_stays_small() -> None:
+    """Regression for F73: without removing repeated conjuncts these grew to ~1,200 nodes in 400 steps."""
+    gg = Always(Always(atom("p")))
+    assert _peak(gg, [frozenset(["p"])] * 400) <= 6
+    after_release = Always(Or(not_atom("released"), Always(not_atom("grasp"))))  # after release, never grasp
+    labels = [frozenset(["grasp"])] * 5 + [frozenset(["released"])] * 395
+    assert _peak(after_release, labels) <= 8
+
+
+def _random_formula(rng: random.Random, depth: int) -> Formula:
+    if depth == 0 or rng.random() < 0.2:
+        r = rng.random()
+        return TT() if r < 0.08 else FF() if r < 0.16 else (atom if rng.random() < 0.6 else not_atom)(rng.choice((A, B)))
+    op = rng.choice(("and", "or", "next", "always", "aw", "ew", "uw"))
+    if op == "and":
+        return And(_random_formula(rng, depth - 1), _random_formula(rng, depth - 1))
+    if op == "or":
+        return Or(_random_formula(rng, depth - 1), _random_formula(rng, depth - 1))
+    if op == "next":
+        return Next(_random_formula(rng, depth - 1))
+    if op == "always":
+        return Always(_random_formula(rng, depth - 1))
+    if op == "uw":
+        return UntilWithin(rng.randint(0, 3), _random_formula(rng, depth - 1), _random_formula(rng, depth - 1))
+    cls = AlwaysWithin if op == "aw" else EventuallyWithin
+    return cls(rng.randint(0, 3), _random_formula(rng, depth - 1))
+
+
+def test_progress_commutes_with_the_simplifiers() -> None:
+    """Python twin of the Lean lemmas `progress_simpAnd` / `progress_simpOr` (lean/BoundedBrain/Normal.lean)."""
+    rng = random.Random(20261023)
+    for _ in range(3000):
+        a, b, label = _random_formula(rng, 4), _random_formula(rng, 4), rng.choice(LABELS)
+        assert progress(label, simp_and(a, b)) == simp_and(progress(label, a), progress(label, b)), (a, b, label)
+        assert progress(label, simp_or(a, b)) == simp_or(progress(label, a), progress(label, b)), (a, b, label)
+
+
+def test_residual_peak_stops_growing() -> None:
+    """Empirical check for nested `always`: the largest residual seen does not grow after the first 200 steps."""
+    rng = random.Random(7)
+    for _ in range(100):
+        spec = Always(_random_formula(rng, 3))
+        labels = [rng.choice(LABELS) for _ in range(400)]
+        assert _peak(spec, labels[:200]) == _peak(spec, labels), spec
 
 
 def test_progress_never_touches_user_visible_constructors_it_should_not() -> None:

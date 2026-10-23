@@ -85,7 +85,7 @@ agreement test fail. The Lean key lemma `progress_sat` (TODO P3-2) is only true 
 extension without having been simplified to `ff` (e.g. contradictory pending obligations). The end-of-trace answer
 is exact. Completeness would need a satisfiability check on the residual (TODO P2-2).
 
-### Resource bound (open)
+### Resource bound (proved 2026-10-23, P3-5)
 
 Per-step residual growth is **not** a constant factor (`G φ` conjoins one new residual per step). Alive obligations age
 and expire after at most `horizon φ` steps (sum of `X`-depth and bounds), so the candidate bound is
@@ -97,6 +97,17 @@ copy, so `G (G p)` grows from 3 to 1,203 nodes in 400 steps (F73, 2026-10-22). P
 (no `always` under `always`) or add normalisation (e.g. deduplicating conjuncts), and the Lean and Python simplifiers
 must change together.
 
+**Resolution (2026-10-23, D-030, D-031).** `simpAnd` / `simpOr` now flatten conjunctions (disjunctions), drop
+`tt` (`ff`), collapse on `ff` (`tt`), and remove repeated conjuncts (disjuncts), keeping the last occurrence. In Lean,
+every residual is in this normal form and progression commutes with the simplifiers (`lean/BoundedBrain/Normal.lean`),
+and `size_run_le` proves `(run φ tr).size ≤ resBound φ` for every trace (`lean/BoundedBrain/Resource.lean`): the
+monitor state is bounded by a number that depends on the spec alone. `resBound φ` is the largest size in an explicit
+finite list `reach φ` that contains every residual; it is small for flat specs (6 for `G ¬grasp_wrong`, 14 for the
+collateral spec, 10 for `G (G p)`) but combinatorially large for `always` nested over a disjunction, where it is not
+computable in practice (F78). Observed peaks are smaller: `G (G p)` stays at 6 nodes and
+`G (released → G ¬grasp)` at 8 over 400 steps (F76). A tighter, computable bound and a per-step time bound are
+not formalised.
+
 ## Assumptions and guarantees
 
 * **A1 (perception).** The labels given to the monitor are correct for the atoms used.
@@ -107,7 +118,7 @@ must change together.
 | ID | Guarantee | Depends on | Evidence |
 |---|---|---|---|
 | G1 | Monitor verdict = LTLf semantics; early verdicts sound | none beyond the definitions | Lean (P3-3, P3-4) — proved 2026-10-18 (F49) |
-| G2 | Step cost and memory bounded by a function of the spec | none | Lean (P3-5) + tests — *open* |
+| G2 | Step cost and memory bounded by a function of the spec | none | Memory: Lean `size_run_le` (P3-5), proved 2026-10-23 (F77); step cost: not formalised (each step is structural recursion over a state of bounded size) |
 | G3 | Executed trace satisfies φ (enforcement) | A1, A3, A4 and a model of what the fallback can do | out of scope for the first paper; do not claim |
 
 ## Interchange format (Lean ↔ Python differential tests)

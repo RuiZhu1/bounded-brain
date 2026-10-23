@@ -51,7 +51,8 @@ sections, the others only in their abstracts (D-027). Claims of absence are abse
   bounded logic. What our proofs add is small: end-of-trace correctness for every trace length (F54 needs a minimum
   length), syntactic `tt`/`ff` verdicts that are sound for every extension, a syntactic bounded-verdict theorem,
   unbounded `G` and strong `X`, and Lean 4. A resource bound would be a further difference, but it does not hold yet:
-  without deduplication, residuals grow linearly when `always` is nested (F73).
+  without deduplication, residuals grow linearly when `always` is nested (F73). *(2026-10-23: now proved after
+  D-030, F77; the bound is very large for nested `always`.)*
 * **Claims that are not available:** "first verified monitor in Lean" (F59); "first machine-checked monitor for an
   autonomous system" (F56, `03` row 29); "first temporal-logic monitoring of manipulation on LIBERO" (F62).
 * **C2** (Lean = Python by differential testing) is good engineering practice; VeriMon did the same in 2019 (F53).
@@ -99,6 +100,8 @@ What (b) commits to, in order (details and IDs in `TODO.md`):
    value from counterfactual branches of saved simulator states (as in F67; our traces store the MuJoCo state at
    every step, D-016).
 6. Later: atom definitions checked in Lean (as in F56), perception noise (A1).
+
+Progress: steps 1 and 2 done on 2026-10-23 (bounded Until, F74; normal form and resource bound, F77).
 
 The analysis that led to the decision follows, unchanged.
 

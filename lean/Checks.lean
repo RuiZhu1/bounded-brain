@@ -13,32 +13,40 @@ import BoundedBrain
 
 open BoundedBrain
 
-/-! ## 1. Statements of the main theorems -/
+/-! ## 1. Statements of the main theorems
+
+Since 2026-10-23 (D-030) the monitor needs `[DecidableEq AP]`: the simplifiers remove repeated conjuncts and
+disjuncts, which compares formulas. The statements are otherwise unchanged. -/
 
 /-- Main theorem: the monitor accepts exactly the traces that satisfy the spec. -/
-example {AP : Type} (φ : Formula AP) (tr : Trace AP) :
+example {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr : Trace AP) :
     accepts φ tr = true ↔ Sat tr φ 0 :=
   accepts_iff_sat φ tr
 
 /-- An early VIOLATED verdict holds for every continuation of the trace. -/
-example {AP : Type} (φ : Formula AP) (tr ext : Trace AP) (h : run φ tr = .ff) :
+example {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr ext : Trace AP) (h : run φ tr = .ff) :
     ¬ Sat (tr ++ ext) φ 0 :=
   violated_sound φ tr ext h
 
 /-- An early SATISFIED verdict holds for every continuation of the trace. -/
-example {AP : Type} (φ : Formula AP) (tr ext : Trace AP) (h : run φ tr = .tt) :
+example {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr ext : Trace AP) (h : run φ tr = .tt) :
     Sat (tr ++ ext) φ 0 :=
   satisfied_sound φ tr ext h
 
 /-- Without unbounded `always`, a verdict is reached after `verdictDepth φ` steps. -/
-example {AP : Type} (φ : Formula AP) (hφ : φ.alwaysFree = true) (tr : Trace AP)
+example {AP : Type} [DecidableEq AP] (φ : Formula AP) (hφ : φ.alwaysFree = true) (tr : Trace AP)
     (h : φ.verdictDepth ≤ tr.length) : run φ tr = .tt ∨ run φ tr = .ff :=
   bounded_verdict φ hφ tr h
 
 /-- ... and that verdict is final and correct for every continuation. -/
-example {AP : Type} (φ : Formula AP) (hφ : φ.alwaysFree = true) (tr ext : Trace AP)
+example {AP : Type} [DecidableEq AP] (φ : Formula AP) (hφ : φ.alwaysFree = true) (tr ext : Trace AP)
     (h : φ.verdictDepth ≤ tr.length) : Sat (tr ++ ext) φ 0 ↔ run φ tr = .tt :=
   verdict_final φ hφ tr ext h
+
+/-- The size of the monitor state is bounded by a number that depends on the spec alone (P3-5). -/
+example {AP : Type} [DecidableEq AP] (φ : Formula AP) (tr : Trace AP) :
+    (run φ tr).size ≤ resBound φ :=
+  size_run_le φ tr
 
 /-! ## 2. Axioms -/
 

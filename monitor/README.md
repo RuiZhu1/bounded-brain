@@ -46,5 +46,6 @@ order.step({"place"})                      # Verdict.VIOLATED  (placed while the
   simplified to `FF`. The end-of-trace answer is exact.
 * Labels (which atoms are true) are an input. The monitor says nothing about whether
   perception produced them correctly (assumption A1).
-* Memory is not yet bounded by the spec alone: with `Always` nested inside `Always`, the residual grows with the
-  trace (`../docs/04-architecture.md`, "Resource bound"; TODO P2-4).
+* The size of the monitor state is bounded by a number that depends on the spec alone (Lean `size_run_le`), but that
+  number is very large when `Always` is nested over a disjunction; observed sizes are small
+  (`../docs/04-architecture.md`, "Resource bound").

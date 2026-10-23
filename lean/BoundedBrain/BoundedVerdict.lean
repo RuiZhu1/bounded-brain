@@ -1,4 +1,4 @@
-import BoundedBrain.Monitor
+import BoundedBrain.Normal
 
 /-
   BoundedBrain.BoundedVerdict — the monitor decides every `always`-free spec within a bounded
@@ -45,38 +45,18 @@ def Formula.verdictDepth {AP : Type} : Formula AP → Nat
 theorem Formula.one_le_verdictDepth {AP : Type} (φ : Formula AP) : 1 ≤ φ.verdictDepth := by
   induction φ <;> simp [Formula.verdictDepth] <;> omega
 
-/-! Absorption laws of the simplifiers, valid for every argument (not only constructors). -/
-
-@[simp] theorem simpAnd_ff_left {AP : Type} (x : Formula AP) : simpAnd .ff x = .ff := rfl
-@[simp] theorem simpAnd_ff_right {AP : Type} (x : Formula AP) : simpAnd x .ff = .ff := by cases x <;> rfl
-@[simp] theorem simpAnd_tt_left {AP : Type} (x : Formula AP) : simpAnd .tt x = x := by cases x <;> rfl
-@[simp] theorem simpAnd_tt_right {AP : Type} (x : Formula AP) : simpAnd x .tt = x := by cases x <;> rfl
-@[simp] theorem simpOr_tt_left {AP : Type} (x : Formula AP) : simpOr .tt x = .tt := rfl
-@[simp] theorem simpOr_tt_right {AP : Type} (x : Formula AP) : simpOr x .tt = .tt := by cases x <;> rfl
-@[simp] theorem simpOr_ff_left {AP : Type} (x : Formula AP) : simpOr .ff x = x := by cases x <;> rfl
-@[simp] theorem simpOr_ff_right {AP : Type} (x : Formula AP) : simpOr x .ff = x := by cases x <;> rfl
-
-/-- Progression commutes with the conjunction simplifier. -/
-theorem progress_simpAnd {AP : Type} (σ : Label AP) (a b : Formula AP) :
-    progress σ (simpAnd a b) = simpAnd (progress σ a) (progress σ b) := by
-  cases a <;> cases b <;>
-    (try simp only [progress, simpAnd_tt_left, simpAnd_tt_right, simpAnd_ff_left, simpAnd_ff_right]) <;> rfl
-
-/-- Progression commutes with the disjunction simplifier. -/
-theorem progress_simpOr {AP : Type} (σ : Label AP) (a b : Formula AP) :
-    progress σ (simpOr a b) = simpOr (progress σ a) (progress σ b) := by
-  cases a <;> cases b <;>
-    (try simp only [progress, simpOr_tt_left, simpOr_tt_right, simpOr_ff_left, simpOr_ff_right]) <;> rfl
+/-! Progression commutes with the simplifiers (`progress_simpAnd`, `progress_simpOr`, Normal.lean), so the monitor
+runs the two sides of a simplified conjunction or disjunction independently. -/
 
 /-- The monitor runs the two sides of a simplified conjunction independently. -/
-theorem run_simpAnd {AP : Type} (a b : Formula AP) (tr : Trace AP) :
+theorem run_simpAnd {AP : Type} [DecidableEq AP] (a b : Formula AP) (tr : Trace AP) :
     run (simpAnd a b) tr = simpAnd (run a tr) (run b tr) := by
   induction tr generalizing a b with
   | nil => rfl
   | cons σ tr ih => rw [run_cons, run_cons, run_cons, progress_simpAnd, ih]
 
 /-- The monitor runs the two sides of a simplified disjunction independently. -/
-theorem run_simpOr {AP : Type} (a b : Formula AP) (tr : Trace AP) :
+theorem run_simpOr {AP : Type} [DecidableEq AP] (a b : Formula AP) (tr : Trace AP) :
     run (simpOr a b) tr = simpOr (run a tr) (run b tr) := by
   induction tr generalizing a b with
   | nil => rfl
@@ -86,17 +66,19 @@ theorem run_simpOr {AP : Type} (a b : Formula AP) (tr : Trace AP) :
 abbrev IsVerdict {AP : Type} (f : Formula AP) : Prop := f = .tt ∨ f = .ff
 
 /-- Definite verdicts are closed under the simplifiers. -/
-theorem simpAnd_isVerdict {AP : Type} {a b : Formula AP} (ha : IsVerdict a) (hb : IsVerdict b) :
-    IsVerdict (simpAnd a b) := by
-  rcases ha with rfl | rfl <;> rcases hb with rfl | rfl <;> simp [IsVerdict]
+theorem simpAnd_isVerdict {AP : Type} [DecidableEq AP] {a b : Formula AP} (ha : IsVerdict a)
+    (hb : IsVerdict b) : IsVerdict (simpAnd a b) := by
+  rcases ha with rfl | rfl <;> rcases hb with rfl | rfl <;>
+    simp [IsVerdict, simpAnd, normAnd, Formula.conjuncts, dedupLast, mkConj]
 
-theorem simpOr_isVerdict {AP : Type} {a b : Formula AP} (ha : IsVerdict a) (hb : IsVerdict b) :
-    IsVerdict (simpOr a b) := by
-  rcases ha with rfl | rfl <;> rcases hb with rfl | rfl <;> simp [IsVerdict]
+theorem simpOr_isVerdict {AP : Type} [DecidableEq AP] {a b : Formula AP} (ha : IsVerdict a)
+    (hb : IsVerdict b) : IsVerdict (simpOr a b) := by
+  rcases ha with rfl | rfl <;> rcases hb with rfl | rfl <;>
+    simp [IsVerdict, simpOr, normOr, Formula.disjuncts, dedupLast, mkDisj]
 
 /-- [P3-8] Bounded verdict: without unbounded `always`, the monitor reaches `tt` or `ff` after at most
 `φ.verdictDepth` steps. -/
-theorem bounded_verdict {AP : Type} (φ : Formula AP) (hφ : φ.alwaysFree = true) (tr : Trace AP)
+theorem bounded_verdict {AP : Type} [DecidableEq AP] (φ : Formula AP) (hφ : φ.alwaysFree = true) (tr : Trace AP)
     (h : φ.verdictDepth ≤ tr.length) : IsVerdict (run φ tr) := by
   induction φ generalizing tr with
   | tt => exact Or.inl (run_tt tr)
@@ -231,7 +213,7 @@ theorem bounded_verdict {AP : Type} (φ : Formula AP) (hφ : φ.alwaysFree = tru
 
 /-- [P3-8] After `d φ` steps the verdict is final: the trace satisfies `φ` however it continues
 exactly when the residual is `tt`. -/
-theorem verdict_final {AP : Type} (φ : Formula AP) (hφ : φ.alwaysFree = true) (tr ext : Trace AP)
+theorem verdict_final {AP : Type} [DecidableEq AP] (φ : Formula AP) (hφ : φ.alwaysFree = true) (tr ext : Trace AP)
     (h : φ.verdictDepth ≤ tr.length) : Sat (tr ++ ext) φ 0 ↔ run φ tr = .tt := by
   rcases bounded_verdict φ hφ tr h with htt | hff
   · exact ⟨fun _ => htt, fun _ => satisfied_sound φ tr ext htt⟩
